@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Shield, AlertCircle, CheckCircle2, Briefcase, Newspaper, Clock, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -61,7 +61,7 @@ export default function DashboardShell({ initialItems, initialStats }: Dashboard
   const scheduleItems = getItemsByCategory('schedule');
   const doneItems = items.filter((i) => i.category === 'done' || i.status === 'completed');
 
-  const tabs: { id: TabType; label: string; icon: React.ReactNode; count: number; pulse?: boolean }[] = [
+  const tabs: { id: TabType; label: string; icon: ReactNode; count: number; pulse?: boolean }[] = [
     { id: 'approval', label: 'Approve', icon: <Shield size={16} />, count: pendingActions.length, pulse: pendingActions.length > 0 },
     { id: 'action', label: 'Action', icon: <AlertCircle size={16} />, count: urgentItems.length },
     { id: 'review', label: 'Review', icon: <Activity size={16} />, count: reviewItems.length },
