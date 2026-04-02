@@ -28,6 +28,7 @@ async function fetchTriageData() {
       console.error('Error fetching triage items:', itemsError);
       return { items: [], stats: null };
     }
+
     // Fetch stats for today
     const { data: statsData, error: statsError } = await supabase
       .from('triage_stats')

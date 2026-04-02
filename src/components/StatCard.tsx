@@ -19,6 +19,7 @@ interface StatCardProps {
 
 /**
  * Large stat card displaying a big number with label and left border
+ * Inspired by ClickUp's stat cards
  */
 export default function StatCard({
   number,

@@ -6,6 +6,8 @@ export type TriageCategory = 'urgent' | 'review' | 'job' | 'news' | 'schedule' |
 export type TriageStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type ScoreLabel = 'strong' | 'apply' | 'light' | 'skip' | 'priority';
 export type SourceType = 'email' | 'linkedin' | 'beeper' | 'calendar' | 'other';
+export type ActionType = 'send_message' | 'apply_job_easy' | 'apply_job_website' | 'accept_connection' | 'reply_email' | 'review_document';
+export type ActionStatus = 'none' | 'pending_review' | 'approved' | 'rejected' | 'executing' | 'executed' | 'failed';
 
 export interface TriageItem {
   id: string;
@@ -24,8 +26,7 @@ export interface TriageItem {
   company: string | null;
   role_title: string | null;
   location: string | null;
-  salary_range: string | null;
-  job_type: string | null;
+  salary_range: string | null;  job_type: string | null;
   easy_apply: boolean | null;
   recruiter_name: string | null;
   contact_name: string | null;
@@ -41,8 +42,19 @@ export interface TriageItem {
   priority: number | null;
   triage_date: string | null;
   notes: string | null;
+  /** A2UI: type of action the agent prepared */
+  action_type: ActionType | null;
+  /** A2UI: structured payload for execution */
+  action_payload: Record<string, unknown> | null;
+  /** A2UI: workflow state for approval queue */
+  action_status: ActionStatus;
+  /** AI-generated cover letter for job applications */
+  cover_letter: string | null;
+  /** Notes on CV sections to highlight for this role */
+  tailored_cv_notes: string | null;
+  /** URL to tailored CV PDF */
+  tailored_cv_url: string | null;
 }
-
 export interface TriageStat {
   triage_date: string;
   urgent_count: number;
