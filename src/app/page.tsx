@@ -10,25 +10,29 @@ export const revalidate = 0; // Disable ISR, fetch fresh data
 
 async function fetchTriageData() {
   try {
-    // Fetch today's triage items
-    const today = format(new Date(), 'yyyy-MM-dd');
+    // Fetch triage items from the last 14 days (items persist until resolved or expired)
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const fourteenDaysAgo = format(
+      new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000),
+      'yyyy-MM-dd'
+    );
 
     const { data: items, error: itemsError } = await supabase
       .from('triage_items')
       .select('*')
-      .eq('triage_date', today)
+      .gte('triage_date', fourteenDaysAgo)
       .order('created_at', { ascending: false });
 
     if (itemsError) {
       console.error('Error fetching triage items:', itemsError);
       return { items: [], stats: null };
     }
-
     // Fetch stats for today
     const { data: statsData, error: statsError } = await supabase
       .from('triage_stats')
       .select('*')
-      .eq('triage_date', today)
+      .eq('triage_date', todayStr)
       .single();
 
     if (statsError && statsError.code !== 'PGRST116') {
