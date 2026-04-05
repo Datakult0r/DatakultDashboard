@@ -1,69 +1,40 @@
-'use client';
-
 import Image from 'next/image';
-import { ExternalLink } from 'lucide-react';
-import type { TriageItem } from '@/types/triage';
 
 interface NewsCardProps {
-  /** The news item to display */
-  item: TriageItem;
+  title: string;
+  source: string;
+  thumbnail?: string;
+  url?: string;
 }
 
 /**
- * News card with large image at top and headline below
- * Vertical layout optimized for 3-column grid with hover zoom effect
+ * News item card with thumbnail (80x60px) and horizontal layout
  */
-export default function NewsCard({ item }: NewsCardProps) {
+export function NewsCard({ title, source, thumbnail, url }: NewsCardProps) {
   return (
-    <div className="bg-surface border border-border rounded-lg overflow-hidden hover:border-secondary/50 transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      {/* Large image area at top */}
-      {item.news_image_url && (
-        <div className="relative w-full h-40 bg-elevated overflow-hidden">
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex gap-3 bg-surface/40 backdrop-blur-sm border border-border/50 rounded-lg p-3 hover:bg-surface/60 transition-colors"
+    >
+      {thumbnail && (
+        <div className="flex-shrink-0 w-20 h-15 bg-border/30 rounded overflow-hidden">
           <Image
-            src={item.news_image_url}
-            alt={item.title}
-            width={400}
-            height={160}
-            className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
+            src={thumbnail}
+            alt={title}
+            width={80}
+            height={60}
+            className="w-full h-full object-cover"
           />
-          {/* Source badge overlay */}
-          {item.news_source && (
-            <div className="absolute top-2 left-2">
-              <span className="inline-block px-2 py-0.5 rounded-sm text-xs font-medium bg-base/90 text-secondary uppercase tracking-wider">
-                {item.news_source}
-              </span>
-            </div>
-          )}
         </div>
       )}
-
-      {/* Content area */}
-      <div className="p-4 flex flex-col gap-2">
-        {/* Title */}
-        <h3 className="text-base font-semibold text-primary line-clamp-2">
-          {item.title}
-        </h3>
-
-        {/* Subtitle/summary */}
-        {item.subtitle && (
-          <p className="text-sm text-secondary line-clamp-2 flex-1">
-            {item.subtitle}
-          </p>
-        )}
-
-        {/* Read more link at bottom */}
-        {item.source_url && (
-          <a
-            href={item.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-accent hover:text-accent/80 flex items-center gap-1 w-fit mt-1 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent rounded px-1"
-          >
-            Read more
-            <ExternalLink size={12} />
-          </a>
-        )}
+      <div className="flex-1 min-w-0">
+        <h3 className="font-medium text-elevated text-sm line-clamp-2">{title}</h3>
+        <p className="text-xs text-base/60 mt-1">{source}</p>
       </div>
-    </div>
+    </a>
   );
 }
+
+export default NewsCard;

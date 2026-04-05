@@ -1,86 +1,93 @@
 'use client';
 
 import { useState } from 'react';
-import { Shield, CheckCheck, Filter } from 'lucide-react';
-import type { TriageItem } from '@/types/triage';
-import ActionCard from './ActionCard';
+import { Check, X } from 'lucide-react';
+import { ActionCard } from './ActionCard';
+
+interface PendingAction {
+  id: string;
+  type: 'send_message' | 'apply_job' | 'reply_email';
+  title: string;
+  payload: Record<string, unknown>;
+}
 
 interface ApprovalQueueProps {
-  items: TriageItem[];
+  pending: PendingAction[];
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
 }
 
-type QueueFilter = 'pending' | 'approved' | 'rejected' | 'all';
+/**
+ * Agentic action approval queue
+ * Displays pending actions for user review and approval
+ */
+export function ApprovalQueue({
+  pending,
+  onApprove,
+  onReject,
+}: ApprovalQueueProps) {
+  const [loading, setLoading] = useState<string | null>(null);
 
-export default function ApprovalQueue({ items, onApprove, onReject }: ApprovalQueueProps) {
-  const [filter, setFilter] = useState<QueueFilter>('pending');
+  const handleApprove = async (id: string) => {
+    setLoading(id);
+    try {
+      await onApprove(id);
+    } finally {
+      setLoading(null);
+    }
+  };
 
-  const pendingItems = items.filter((i) => i.action_status === 'pending_review');
-  const approvedItems = items.filter((i) => i.action_status === 'approved' || i.action_status === 'executing' || i.action_status === 'executed');
-  const rejectedItems = items.filter((i) => i.action_status === 'rejected');
+  const handleReject = async (id: string) => {
+    setLoading(id);
+    try {
+      await onReject(id);
+    } finally {
+      setLoading(null);
+    }
+  };
 
-  const filteredItems = filter === 'pending' ? pendingItems
-    : filter === 'approved' ? approvedItems
-    : filter === 'rejected' ? rejectedItems : items;
-
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (a.action_status === 'pending_review' && b.action_status !== 'pending_review') return -1;
-    if (a.action_status !== 'pending_review' && b.action_status === 'pending_review') return 1;
-    return (b.score || 0) - (a.score || 0);
-  });
-
-  const filters: { id: QueueFilter; label: string; count: number }[] = [
-    { id: 'pending', label: 'Pending', count: pendingItems.length },
-    { id: 'approved', label: 'Approved', count: approvedItems.length },
-    { id: 'rejected', label: 'Rejected', count: rejectedItems.length },
-    { id: 'all', label: 'All', count: items.length },
-  ];
+  if (pending.length === 0) {
+    return (
+      <div className="text-center py-8 text-base/60">
+        <p className="text-sm">No pending actions</p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-warning">
-            <Shield size={18} />
-            <span className="text-sm font-semibold">{pendingItems.length} awaiting review</span>
-          </div>
-          {approvedItems.length > 0 && (
-            <div className="flex items-center gap-1.5 text-success/70">
-              <CheckCheck size={14} />
-              <span className="text-xs">{approvedItems.length} approved</span>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Filter size={14} className="text-secondary mr-1" />
-          {filters.map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)}
-              className={`px-2.5 py-1 text-xs rounded-sm font-medium transition-colors ${
-                filter === f.id ? 'bg-accent/15 text-accent border border-accent/30'
-                  : 'text-secondary hover:text-primary hover:bg-elevated border border-transparent'
-              }`}>
-              {f.label}{f.count > 0 && <span className="ml-1 opacity-70">{f.count}</span>}
+    <div className="space-y-3">
+      {pending.map((action) => (
+        <div
+          key={action.id}
+          className="bg-surface/40 backdrop-blur-sm border border-primary/30 rounded-lg p-4"
+        >
+          <ActionCard
+            type={action.type}
+            title={action.title}
+            payload={action.payload}
+          />
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => handleApprove(action.id)}
+              disabled={loading === action.id}
+              className="flex-1 flex items-center justify-center gap-2 bg-success/20 hover:bg-success/30 text-success rounded py-2 transition-colors disabled:opacity-50"
+            >
+              <Check size={16} />
+              <span className="text-sm font-medium">Approve</span>
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-3">
-        {sortedItems.length === 0 ? (
-          <div className="text-center py-16">
-            <Shield size={32} className="mx-auto text-secondary/40 mb-3" />
-            <p className="text-secondary text-sm">
-              {filter === 'pending' ? 'No actions awaiting review. The agent will prepare more during the next triage.'
-                : `No ${filter} items.`}
-            </p>
+            <button
+              onClick={() => handleReject(action.id)}
+              disabled={loading === action.id}
+              className="flex-1 flex items-center justify-center gap-2 bg-danger/20 hover:bg-danger/30 text-danger rounded py-2 transition-colors disabled:opacity-50"
+            >
+              <X size={16} />
+              <span className="text-sm font-medium">Reject</span>
+            </button>
           </div>
-        ) : (
-          sortedItems.map((item) => (
-            <ActionCard key={item.id} item={item} onApprove={onApprove} onReject={onReject} />
-          ))
-        )}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
+
+export default ApprovalQueue;

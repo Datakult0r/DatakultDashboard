@@ -1,63 +1,79 @@
-import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
-import type { TriageItem, TriageStat } from '@/types/triage';
-import DashboardShell from '@/components/DashboardShell';
+import { formatDistanceToNow } from 'date-fns';
+import { DashboardShell } from '@/components/DashboardShell';
 
 /**
- * Server component: Fetch triage data from Supabase
+ * Server component that fetches triage_items, triage_stats, and job_applications
+ * Uses date-fns for formatting
  */
-export const revalidate = 0; // Disable ISR, fetch fresh data
-
-async function fetchTriageData() {
+export default async function Home() {
   try {
-    // Fetch triage items from the last 14 days (items persist until resolved or expired)
-    const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const fourteenDaysAgo = format(
-      new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000),
-      'yyyy-MM-dd'
-    );
-
-    const { data: items, error: itemsError } = await supabase
+    // Fetch triage items
+    const { data: triageItems } = await supabase
       .from('triage_items')
       .select('*')
-      .gte('triage_date', fourteenDaysAgo)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-    if (itemsError) {
-      console.error('Error fetching triage items:', itemsError);
-      return { items: [], stats: null };
-    }
-
-    // Fetch stats for today
-    const { data: statsData, error: statsError } = await supabase
+    // Fetch stats (triage_stats is a VIEW)
+    const { data: stats } = await supabase
       .from('triage_stats')
       .select('*')
-      .eq('triage_date', todayStr)
       .single();
 
-    if (statsError && statsError.code !== 'PGRST116') {
-      // PGRST116 is "not found", which is ok
-      console.error('Error fetching triage stats:', statsError);
-    }
+    // Fetch job applications
+    const { data: applications } = await supabase
+      .from('job_applications')
+      .select('*')
+      .order('applied_date', { ascending: false })
+      .limit(50);
 
-    return {
-      items: (items as TriageItem[]) || [],
-      stats: (statsData as TriageStat) || null,
-    };
+    return (
+      <main className="min-h-screen bg-base">
+        <div className="container mx-auto px-4 py-8">
+          <header className="mb-8">
+            <h1 className="text-4xl font-bold text-elevated mb-2">
+              Triage Dashboard
+            </h1>
+            <p className="text-base/60">
+              Real-time job application triage and approvals
+            </p>
+          </header>
+
+          <DashboardShell />
+
+          {/* Debug info - remove in production */}
+          <div className="mt-12 text-xs text-base/40">
+            <p>Triage items: {triageItems?.length || 0}</p>
+            <p>Stats: {stats ? 'loaded' : 'pending'}</p>
+            <p>Applications: {applications?.length || 0}</p>
+          </div>
+        </div>
+      </main>
+    );
   } catch (error) {
-    console.error('Unexpected error fetching triage data:', error);
-    return { items: [], stats: null };
+    console.error('Failed to fetch dashboard data:', error);
+
+    return (
+      <main className="min-h-screen bg-base">
+        <div className="container mx-auto px-4 py-8">
+          <header className="mb-8">
+            <h1 className="text-4xl font-bold text-elevated mb-2">
+              Triage Dashboard
+            </h1>
+            <p className="text-base/60">
+              Real-time job application triage and approvals
+            </p>
+          </header>
+
+          <div className="bg-danger/10 border border-danger/30 rounded-lg p-4 text-danger text-sm">
+            <p className="font-medium">Error loading dashboard</p>
+            <p className="text-xs mt-1">
+              Unable to fetch data from Supabase. Please check your connection.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
   }
-}
-
-export default async function Home() {
-  const { items, stats } = await fetchTriageData();
-
-  return (
-    <DashboardShell
-      initialItems={items}
-      initialStats={stats}
-    />
-  );
 }

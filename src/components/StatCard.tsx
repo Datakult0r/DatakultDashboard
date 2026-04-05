@@ -1,46 +1,36 @@
-'use client';
-
 import { ReactNode } from 'react';
 
 interface StatCardProps {
-  number: number;
-  label: string;
   icon?: ReactNode;
-  bgColor?: string;
-  borderColor?: string;
-  numberColor?: string;
-  subtext?: string;
+  label: string;
+  value: string | number;
+  trend?: { value: number; direction: 'up' | 'down' };
 }
 
-export default function StatCard({
-  number,
-  label,
-  icon,
-  bgColor,
-  borderColor = 'border-secondary',
-  numberColor = 'text-primary',
-  subtext,
-}: StatCardProps) {
-  const containerClass = bgColor
-    ? `${bgColor} border border-border rounded-lg p-4 sm:p-5 flex flex-col gap-2 min-w-[120px] hover:border-secondary/50 transition-colors`
-    : `bg-surface border border-border border-l-4 ${borderColor} rounded-lg p-4 sm:p-6 flex flex-col gap-2 min-w-[140px] hover:border-secondary/50 transition-colors`;
-
+/**
+ * Large stat display card with icon support
+ * ClickUp-style layout
+ */
+export function StatCard({ icon, label, value, trend }: StatCardProps) {
   return (
-    <div className={containerClass}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className={`text-3xl sm:text-4xl font-bold font-mono tabular-nums ${numberColor}`}>
-            {number}
-          </div>
-          <div className="text-xs sm:text-sm text-secondary font-medium mt-1">
-            {label}
-          </div>
-          {subtext && (
-            <div className="text-xs text-secondary/60 mt-1">{subtext}</div>
-          )}
-        </div>
-        {icon && <div className="flex-shrink-0 opacity-60">{icon}</div>}
+    <div className="bg-surface/40 backdrop-blur-sm border border-border/50 rounded-lg p-6 hover:bg-surface/60 transition-colors">
+      {icon && <div className="text-primary mb-3">{icon}</div>}
+      <p className="text-sm text-base/60 mb-2">{label}</p>
+      <div className="flex items-baseline gap-2">
+        <p className="text-3xl font-bold text-elevated">{value}</p>
+        {trend && (
+          <span
+            className={`text-xs font-medium ${
+              trend.direction === 'up' ? 'text-success' : 'text-danger'
+            }`}
+          >
+            {trend.direction === 'up' ? '+' : '-'}
+            {trend.value}%
+          </span>
+        )}
       </div>
     </div>
   );
 }
+
+export default StatCard;

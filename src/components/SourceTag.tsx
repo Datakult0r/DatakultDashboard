@@ -1,35 +1,30 @@
-'use client';
-
-import type { SourceType } from '@/types/triage';
+import { Badge } from '@/components/ui/badge';
 
 interface SourceTagProps {
-  /** The source type for the triage item */
-  source: string;
-  /** Optional custom source type override */
-  sourceType?: SourceType;
+  source: 'email' | 'linkedin' | 'beeper' | 'calendar' | 'other';
 }
 
 /**
- * Colored pill badge for source type
+ * Displays a colored pill badge for different source types
  */
-export default function SourceTag({ source, sourceType }: SourceTagProps) {
-  const normalizedSource = sourceType || (source.toLowerCase() as SourceType);
-
-  const colorMap: Record<SourceType, { bg: string; text: string }> = {
-    email: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
-    linkedin: { bg: 'bg-green-500/20', text: 'text-green-400' },
-    beeper: { bg: 'bg-violet-500/20', text: 'text-violet-400' },
-    calendar: { bg: 'bg-amber-500/20', text: 'text-amber-400' },
-    other: { bg: 'bg-gray-500/20', text: 'text-secondary' },
+export function SourceTag({ source }: SourceTagProps) {
+  const variants: Record<string, { bg: string; text: string; label: string }> = {
+    email: { bg: 'bg-blue-900/30', text: 'text-blue-300', label: 'Email' },
+    linkedin: { bg: 'bg-green-900/30', text: 'text-green-300', label: 'LinkedIn' },
+    beeper: { bg: 'bg-violet-900/30', text: 'text-violet-300', label: 'Beeper' },
+    calendar: { bg: 'bg-amber-900/30', text: 'text-amber-300', label: 'Calendar' },
+    other: { bg: 'bg-gray-700/30', text: 'text-gray-300', label: 'Other' },
   };
 
-  const colors = colorMap[normalizedSource] || colorMap.other;
+  const config = variants[source] || variants.other;
 
   return (
     <span
-      className={`inline-block px-2 py-1 rounded-sm text-xs font-medium ${colors.bg} ${colors.text}`}
+      className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
     >
-      {source}
+      {config.label}
     </span>
   );
 }
+
+export default SourceTag;

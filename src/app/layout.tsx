@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from 'next';
+import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -8,35 +8,26 @@ const inter = Inter({
   display: 'swap',
 });
 
-const jetbrains = JetBrains_Mono({
-  variable: '--font-mono',
+const jetbrainsMono = JetBrains_Mono({
+  variable: '--font-jetbrains-mono',
   subsets: ['latin'],
   display: 'swap',
 });
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-};
-
 export const metadata: Metadata = {
-  title: 'Morning Triage | Clinic of AI',
-  description: 'Daily triage dashboard for managing priorities, job pipeline, and communications.',
+  title: 'Triage Dashboard',
+  description: 'Real-time job application triage and approvals',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${jetbrains.variable} h-full`}
-    >
-      <body className="min-h-full bg-base text-primary">
-        {children}
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="font-sans antialiased dark bg-base text-elevated">
+        <div className="min-h-screen">{children}</div>
       </body>
     </html>
   );
