@@ -75,6 +75,25 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     return () => clearInterval(t);
   }, []);
 
+  // Browser tab title — pulse the SLA breach count + pending count so you know
+  // there's work waiting from any other tab.
+  useEffect(() => {
+    const breaches = allItems.filter(
+      (i) =>
+        i.follow_up_at &&
+        new Date(i.follow_up_at) < new Date() &&
+        (i.action_status === 'approved' || i.action_status === 'executing'),
+    ).length;
+    const pending = allItems.filter(
+      (i) => i.action_type !== null && (i.action_status === 'pending_review' || (i.action_status as string) === 'pending'),
+    ).length;
+    const total = breaches + pending;
+    const base = 'Control Tower';
+    if (breaches > 0) document.title = `(${breaches}) ⚠ ${base}`;
+    else if (total > 0) document.title = `(${total}) ${base}`;
+    else document.title = base;
+  }, [allItems]);
+
   // Cross-component navigation events (used by NowSurface promote toast "View" action)
   useEffect(() => {
     const handler = (e: Event) => {

@@ -105,8 +105,23 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
   const [hero, ...rest] = actions;
   const followUps = rest.slice(0, 5);
 
+  // Summary line — when there ARE actions, give a one-line read of the focus list
+  const breachCount = actions.filter((a) => a.reason === 'sla_breach').length;
+  const dueCount = actions.filter((a) => a.reason === 'engagement_due').length;
+  const pendingCount = actions.filter((a) => a.reason === 'pending_review').length;
+
   return (
     <div className="space-y-6">
+      {/* Summary header — only shows when there's something to do */}
+      {hasActions && (
+        <div className="flex items-center gap-3 text-[11px] font-mono text-tertiary px-1">
+          <span>Focus list:</span>
+          {pendingCount > 0 && <span className="text-accent">{pendingCount} pending</span>}
+          {breachCount > 0 && <span className="text-danger">{breachCount} overdue</span>}
+          {dueCount > 0 && <span className="text-money">{dueCount} engagement{dueCount === 1 ? '' : 's'} due</span>}
+        </div>
+      )}
+
       {/* Wins + outbound row — visible above the fold even when there are no actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="md:col-span-2">
@@ -121,10 +136,28 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
           <p className="text-secondary text-sm">Loading the focus list…</p>
         </div>
       ) : !hasActions ? (
-        <div className="text-center py-16 animate-fade-in bg-surface border border-border rounded-lg">
-          <Zap size={32} className="mx-auto text-accent/60 mb-3" />
-          <p className="text-primary text-sm font-medium">Inbox zero.</p>
-          <p className="text-secondary text-xs mt-1">No actions waiting and no overdue follow-ups.</p>
+        <div className="bg-surface border border-border rounded-lg p-6 animate-fade-in">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={16} className="text-accent" />
+            <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
+              Inbox zero — what now?
+            </span>
+          </div>
+          <h2 className="text-xl font-semibold text-primary mb-3">Today&apos;s mission, then</h2>
+          <ul className="space-y-2 text-sm text-secondary">
+            <li className="flex items-start gap-2">
+              <span className="text-accent mt-0.5">→</span>
+              <span>Log 5 outbound prospect touches (use the counter on the right).</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-money mt-0.5">→</span>
+              <span>Open the Pipeline tab and advance one customer engagement by one stage.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-info mt-0.5">→</span>
+              <span>Update April&apos;s revenue + expenses in the runway widget so your runway reads true.</span>
+            </li>
+          </ul>
         </div>
       ) : (
         <>

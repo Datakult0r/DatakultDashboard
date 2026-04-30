@@ -18,7 +18,10 @@ export default function WeeklyWinsBar() {
     return () => { cancelled = true; };
   }, []);
 
+  // Hide entirely when there are no wins — empty zero-zero-zero is demoralising
   if (!w) return null;
+  const hasAny = w.actions_taken > 0 || w.outbound_sent > 0 || w.won_count > 0 || w.won_value_eur > 0;
+  if (!hasAny) return null;
 
   const items = [
     { icon: <CheckCircle2 size={12} />, label: 'actions taken',  value: w.actions_taken,  color: 'text-accent' },

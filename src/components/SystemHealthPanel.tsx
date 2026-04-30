@@ -79,14 +79,13 @@ export default function SystemHealthPanel() {
     let cancelled = false;
     setLoading(true);
 
-    (async () => {
+    const reload = async () => {
       const { data, error } = await supabase
         .from('system_health_summary')
         .select('*')
         .eq('recency_rank', 1)
         .order('source')
         .order('operation');
-
       if (cancelled) return;
       if (error) {
         console.error('Failed to load system_health_summary', error);
@@ -95,10 +94,21 @@ export default function SystemHealthPanel() {
         setRows((data || []) as SystemHealthRow[]);
       }
       setLoading(false);
-    })();
+    };
+
+    reload();
+
+    // Realtime — auto-refresh when a new system_health row lands (e.g. cron just ran)
+    const channel = supabase
+      .channel('system_health_panel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_health' }, () => {
+        reload();
+      })
+      .subscribe();
 
     return () => {
       cancelled = true;
+      channel.unsubscribe();
     };
   }, [refreshKey]);
 
