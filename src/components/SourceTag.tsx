@@ -1,30 +1,40 @@
-import { Badge } from '@/components/ui/badge';
+'use client';
+
+import type { SourceType } from '@/types/triage';
 
 interface SourceTagProps {
-  source: 'email' | 'linkedin' | 'beeper' | 'calendar' | 'other';
+  /** The source type for the triage item */
+  source: string;
+  /** Optional custom source type override */
+  sourceType?: SourceType;
 }
 
 /**
- * Displays a colored pill badge for different source types
+ * Colored pill badge for source type
  */
-export function SourceTag({ source }: SourceTagProps) {
-  const variants: Record<string, { bg: string; text: string; label: string }> = {
-    email: { bg: 'bg-blue-900/30', text: 'text-blue-300', label: 'Email' },
-    linkedin: { bg: 'bg-green-900/30', text: 'text-green-300', label: 'LinkedIn' },
-    beeper: { bg: 'bg-violet-900/30', text: 'text-violet-300', label: 'Beeper' },
-    calendar: { bg: 'bg-amber-900/30', text: 'text-amber-300', label: 'Calendar' },
-    other: { bg: 'bg-gray-700/30', text: 'text-gray-300', label: 'Other' },
+export default function SourceTag({ source, sourceType }: SourceTagProps) {
+  const normalizedSource = sourceType || (source.toLowerCase() as SourceType);
+
+  const colorMap: Record<SourceType, { bg: string; text: string }> = {
+    email: { bg: 'bg-info/10', text: 'text-info' },
+    gmail: { bg: 'bg-info/10', text: 'text-info' },
+    gmail_personal: { bg: 'bg-purple-700/10', text: 'text-purple-700' },
+    linkedin: { bg: 'bg-teal-700/10', text: 'text-teal-700' },
+    linkedin_dm: { bg: 'bg-teal-700/10', text: 'text-teal-700' },
+    beeper: { bg: 'bg-accent/10', text: 'text-accent' },
+    whatsapp: { bg: 'bg-success/10', text: 'text-success' },
+    calendar: { bg: 'bg-orange-700/10', text: 'text-orange-700' },
+    system: { bg: 'bg-gray-300/40', text: 'text-gray-500' },
+    other: { bg: 'bg-gray-300/40', text: 'text-secondary' },
   };
 
-  const config = variants[source] || variants.other;
+  const colors = colorMap[normalizedSource] || colorMap.other;
 
   return (
     <span
-      className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
+      className={`inline-block px-2 py-1 rounded-sm text-xs font-medium ${colors.bg} ${colors.text}`}
     >
-      {config.label}
+      {source}
     </span>
   );
 }
-
-export default SourceTag;

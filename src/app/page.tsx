@@ -1,79 +1,78 @@
+import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
-import { formatDistanceToNow } from 'date-fns';
-import { DashboardShell } from '@/components/DashboardShell';
+import type { TriageItem, TriageStat, JobApplication } from '@/types/triage';
+import DashboardShell from '@/components/DashboardShell';
 
 /**
- * Server component that fetches triage_items, triage_stats, and job_applications
- * Uses date-fns for formatting
+ * Server component: Fetch triage data from Supabase
  */
-export default async function Home() {
+export const revalidate = 0; // Disable ISR, fetch fresh data
+
+async function fetchTriageData(): Promise<{
+  items: TriageItem[];
+  stats: TriageStat | null;
+  applications: JobApplication[];
+}> {
   try {
-    // Fetch triage items
-    const { data: triageItems } = await supabase
+    // Fetch last 14 days of triage items (matches retention policy)
+    const today = new Date();
+    const fourteenDaysAgo = new Date(today);
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const cutoffStr = format(fourteenDaysAgo, 'yyyy-MM-dd');
+
+    const { data: items, error: itemsError } = await supabase
       .from('triage_items')
       .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20);
+      .gte('triage_date', cutoffStr)
+      .order('created_at', { ascending: false });
 
-    // Fetch stats (triage_stats is a VIEW)
-    const { data: stats } = await supabase
+    if (itemsError) {
+      console.error('Error fetching triage items:', itemsError);
+      return { items: [], stats: null, applications: [] };
+    }
+
+    // Fetch stats for today
+    const { data: statsData, error: statsError } = await supabase
       .from('triage_stats')
       .select('*')
+      .eq('triage_date', todayStr)
       .single();
 
-    // Fetch job applications
-    const { data: applications } = await supabase
+    if (statsError && statsError.code !== 'PGRST116') {
+      // PGRST116 is "not found", which is ok
+      console.error('Error fetching triage stats:', statsError);
+    }
+
+    // Fetch all job applications (no date filter — these persist)
+    const { data: applications, error: appsError } = await supabase
       .from('job_applications')
       .select('*')
-      .order('applied_date', { ascending: false })
-      .limit(50);
+      .order('applied_date', { ascending: false });
 
-    return (
-      <main className="min-h-screen bg-base">
-        <div className="container mx-auto px-4 py-8">
-          <header className="mb-8">
-            <h1 className="text-4xl font-bold text-elevated mb-2">
-              Triage Dashboard
-            </h1>
-            <p className="text-base/60">
-              Real-time job application triage and approvals
-            </p>
-          </header>
+    if (appsError) {
+      console.error('Error fetching job applications:', appsError);
+    }
 
-          <DashboardShell />
-
-          {/* Debug info - remove in production */}
-          <div className="mt-12 text-xs text-base/40">
-            <p>Triage items: {triageItems?.length || 0}</p>
-            <p>Stats: {stats ? 'loaded' : 'pending'}</p>
-            <p>Applications: {applications?.length || 0}</p>
-          </div>
-        </div>
-      </main>
-    );
+    return {
+      items: (items as TriageItem[]) ?? [],
+      stats: (statsData as TriageStat) ?? null,
+      applications: (applications as JobApplication[]) ?? [],
+    };
   } catch (error) {
-    console.error('Failed to fetch dashboard data:', error);
-
-    return (
-      <main className="min-h-screen bg-base">
-        <div className="container mx-auto px-4 py-8">
-          <header className="mb-8">
-            <h1 className="text-4xl font-bold text-elevated mb-2">
-              Triage Dashboard
-            </h1>
-            <p className="text-base/60">
-              Real-time job application triage and approvals
-            </p>
-          </header>
-
-          <div className="bg-danger/10 border border-danger/30 rounded-lg p-4 text-danger text-sm">
-            <p className="font-medium">Error loading dashboard</p>
-            <p className="text-xs mt-1">
-              Unable to fetch data from Supabase. Please check your connection.
-            </p>
-          </div>
-        </div>
-      </main>
-    );
+    console.error('Unexpected error fetching triage data:', error);
+    return { items: [], stats: null, applications: [] };
   }
+}
+
+export default async function Home() {
+  const { items, stats, applications } = await fetchTriageData();
+
+  return (
+    <DashboardShell
+      initialItems={items}
+      initialStats={stats}
+      initialApplications={applications}
+    />
+  );
 }

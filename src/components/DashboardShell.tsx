@@ -28,6 +28,9 @@ import ApprovalQueue from './ApprovalQueue';
 import ApplicationTracker from './ApplicationTracker';
 import MissedMeetingCard from './MissedMeetingCard';
 import MissionCriticalBar from './MissionCriticalBar';
+import SystemAlert from './SystemAlert';
+import ChatWidget from './ChatWidget';
+import ErrorBoundary from './ErrorBoundary';
 import type { MissionItem } from './MissionCriticalBar';
 
 type TabType = 'missed' | 'approval' | 'action' | 'review' | 'jobs' | 'applications' | 'news' | 'schedule' | 'done';
@@ -53,6 +56,7 @@ export default function DashboardShell({
   const [items, setItems] = useState<TriageItem[]>(initialItems);
   const [stats, setStats] = useState<TriageStat | null>(initialStats);
   const [applications, setApplications] = useState<JobApplication[]>(initialApplications);
+  // Default to missed tab if there are pending missed items, otherwise approval
   const [activeTab, setActiveTab] = useState<TabType>(
     initialItems.some((i) => i.tags?.includes('missed') && i.action_status === 'pending_review')
       ? 'missed'
@@ -140,6 +144,7 @@ export default function DashboardShell({
 
   // Application status change handler
   const handleApplicationStatusChange = useCallback(async (id: string, status: ApplicationStatus) => {
+    // Optimistic update
     setApplications((prev) =>
       prev.map((app) =>
         app.id === id ? { ...app, status, last_activity_date: new Date().toISOString().split('T')[0] } : app
@@ -152,6 +157,7 @@ export default function DashboardShell({
     });
     if (!res.ok) {
       console.error('Failed to update application status');
+      // Revert on failure — refetch
       const { data } = await supabase.from('job_applications').select('*').order('applied_date', { ascending: false });
       if (data) setApplications(data as JobApplication[]);
     }
@@ -165,6 +171,7 @@ export default function DashboardShell({
       body: JSON.stringify({ id }),
     });
     if (!res.ok) throw new Error('Failed to approve');
+    // Optimistic update
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, action_status: 'approved' as const } : item
@@ -180,6 +187,7 @@ export default function DashboardShell({
       body: JSON.stringify({ id }),
     });
     if (!res.ok) throw new Error('Failed to reject');
+    // Optimistic update
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, action_status: 'rejected' as const } : item
@@ -209,6 +217,7 @@ export default function DashboardShell({
   );
 
   // ── Mission-Critical Focus Items ──
+  // Derive from pipeline contacts, high-priority items, and strategic deadlines
   const missionItems: MissionItem[] = (() => {
     const missions: MissionItem[] = [];
 
@@ -259,7 +268,7 @@ export default function DashboardShell({
     return missions.slice(0, 3);
   })();
 
-  // Tab configuration
+  // Tab configuration — Missed meetings first when they exist, then Approval Queue
   const tabs: { id: TabType; label: string; icon: React.ReactNode; count: number; pulse?: boolean; danger?: boolean }[] = [
     ...(missedItems.length > 0 ? [{ id: 'missed' as TabType, label: 'Missed', icon: <PhoneOff size={16} />, count: missedPending.length, pulse: missedPending.length > 0, danger: missedPending.length > 0 }] : []),
     { id: 'approval', label: 'Approve', icon: <Shield size={16} />, count: pendingActions.length, pulse: pendingActions.length > 0 },
@@ -429,16 +438,15 @@ export default function DashboardShell({
 
   return (
     <div className="min-h-screen flex flex-col relative z-10">
-      {/* Header */}
+      {/* Header — refined with atmospheric gradient */}
       <header className="glass border-b border-border/60 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] tracking-[0.25em] uppercase text-secondary/60"
-                 style={{ fontFamily: 'var(--font-display)' }}>
-                Clinic of AI
+              <p className="text-[10px] tracking-[0.25em] uppercase text-secondary font-mono">
+                01 — Clinic of AI
               </p>
-              <h1 className="text-2xl sm:text-3xl font-bold text-primary mt-1 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-semibold text-primary mt-1 tracking-tight">
                 Control Tower
               </h1>
             </div>
@@ -450,7 +458,7 @@ export default function DashboardShell({
                   href="https://www.linkedin.com/messaging/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-[#0a66c2]/10 text-[#5b9cf5] hover:bg-[#0a66c2]/20 border border-[#0a66c2]/20 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-info/10 text-info hover:bg-info/20 border border-info/20 transition-colors"
                   title="Open LinkedIn Messages"
                 >
                   <Globe size={13} />
@@ -490,7 +498,7 @@ export default function DashboardShell({
         </div>
       </header>
 
-      {/* Stats row */}
+      {/* Stats row — refined cards */}
       <div className="glass border-b border-border/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className={`grid grid-cols-2 gap-2 ${missedPending.length > 0 ? 'sm:grid-cols-6' : 'sm:grid-cols-5'} sm:gap-3`}>
@@ -547,7 +555,7 @@ export default function DashboardShell({
         <MissionCriticalBar items={missionItems} />
       )}
 
-      {/* Tab navigation */}
+      {/* Tab navigation — elevated with glass effect */}
       <div className="glass border-b border-border/40 sticky top-[73px] sm:top-[81px] z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-0.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -593,15 +601,29 @@ export default function DashboardShell({
 
       {/* Content area with tab transition */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div key={activeTab} className="animate-tab-enter">
-          {renderTabContent()}
-        </div>
+        {/* System alerts */}
+        {items.some((i) => i.notes?.includes('0 credits') || i.notes?.includes('no_credits') || i.notes?.includes('No Browser Use')) && (
+          <div className="mb-4">
+            <SystemAlert
+              type="warning"
+              message="Browser Use Cloud has 0 credits. Easy Apply is disabled until credits are added."
+              actionUrl="https://cloud.browser-use.com"
+              actionLabel="Add Credits"
+            />
+          </div>
+        )}
+
+        <ErrorBoundary label={activeTab}>
+          <div key={activeTab} className="animate-tab-enter">
+            {renderTabContent()}
+          </div>
+        </ErrorBoundary>
       </main>
 
       {/* Footer */}
       <footer className="glass border-t border-border/40 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-xs text-secondary/60">
-          <span style={{ fontFamily: 'var(--font-display)' }} className="text-[10px] tracking-wider">
+          <span className="text-[10px] tracking-[0.15em] uppercase font-mono">
             AG-UI · Chatless Surface
           </span>
           <div className="flex items-center gap-3">
@@ -615,6 +637,9 @@ export default function DashboardShell({
           </div>
         </div>
       </footer>
+
+      {/* Chat widget — natural language dashboard assistant */}
+      <ChatWidget items={items} applications={applications} stats={stats} />
     </div>
   );
 }

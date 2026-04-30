@@ -78,8 +78,7 @@ export default function MissionCriticalBar({ items }: MissionCriticalBarProps) {
         <div className="flex items-center gap-2 mb-2.5">
           <Target size={13} className="text-secondary/50" />
           <span
-            className="text-[10px] tracking-[0.2em] uppercase text-secondary/50 font-semibold"
-            style={{ fontFamily: 'var(--font-display)' }}
+            className="text-[10px] tracking-[0.2em] uppercase text-secondary/50 font-semibold font-mono"
           >
             Mission Critical
           </span>

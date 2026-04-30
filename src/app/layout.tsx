@@ -8,26 +8,30 @@ const inter = Inter({
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: '--font-jetbrains-mono',
+const jetbrains = JetBrains_Mono({
+  variable: '--font-mono',
   subsets: ['latin'],
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: 'Triage Dashboard',
-  description: 'Real-time job application triage and approvals',
+  title: 'Morning Triage | Clinic of AI',
+  description: 'Daily triage dashboard for managing priorities, job pipeline, and communications.',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="font-sans antialiased dark bg-base text-elevated">
-        <div className="min-h-screen">{children}</div>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetbrains.variable} h-full`}
+    >
+      <body className="min-h-full bg-base text-primary">
+        {children}
       </body>
     </html>
   );

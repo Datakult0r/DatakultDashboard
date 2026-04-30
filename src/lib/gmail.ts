@@ -1,5 +1,6 @@
 /**
  * Gmail API integration using OAuth2 refresh tokens.
+ * Supports multiple Gmail accounts (business + personal).
  * Fetches unread emails from the last 24 hours and returns structured data.
  * No browser needed — runs server-side via Google APIs.
  */
@@ -21,6 +22,8 @@ interface GmailMessage {
   date: string;
   isUnread: boolean;
   labels: string[];
+  /** Which account this came from */
+  account: 'business' | 'personal';
 }
 
 interface TokenResponse {
@@ -83,7 +86,8 @@ async function listMessages(
  */
 async function getMessage(
   accessToken: string,
-  messageId: string
+  messageId: string,
+  account: 'business' | 'personal'
 ): Promise<GmailMessage> {
   const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`;
 
@@ -128,23 +132,18 @@ async function getMessage(
     date: getHeader('Date'),
     isUnread: (data.labelIds || []).includes('UNREAD'),
     labels: data.labelIds || [],
+    account,
   };
 }
 
 /**
- * Main export: Fetch all unread emails from the last 24 hours.
- * Returns structured messages ready for scoring.
+ * Fetch unread emails from a single account.
  */
-export async function fetchUnreadEmails(): Promise<GmailMessage[]> {
-  const clientId = process.env.GMAIL_CLIENT_ID;
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Missing Gmail OAuth credentials (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)');
-  }
-
-  const accessToken = await getAccessToken({ clientId, clientSecret, refreshToken });
+async function fetchFromAccount(
+  creds: GmailCredentials,
+  account: 'business' | 'personal'
+): Promise<GmailMessage[]> {
+  const accessToken = await getAccessToken(creds);
 
   // Search: unread, last 24h, skip promotions/social/forums
   const query = 'is:unread newer_than:1d -category:promotions -category:social -category:updates -category:forums';
@@ -161,12 +160,53 @@ export async function fetchUnreadEmails(): Promise<GmailMessage[]> {
   for (let i = 0; i < messageRefs.length; i += batchSize) {
     const batch = messageRefs.slice(i, i + batchSize);
     const batchResults = await Promise.all(
-      batch.map((ref) => getMessage(accessToken, ref.id))
+      batch.map((ref) => getMessage(accessToken, ref.id, account))
     );
     messages.push(...batchResults);
   }
 
   return messages;
+}
+
+/**
+ * Main export: Fetch all unread emails from all configured accounts.
+ * Business account: philippe.kung@clinicofai.com (primary)
+ * Personal account: philippelobokung@gmail.com (if GMAIL_REFRESH_TOKEN_PERSONAL is set)
+ */
+export async function fetchUnreadEmails(): Promise<GmailMessage[]> {
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Missing Gmail OAuth credentials (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)');
+  }
+
+  const allMessages: GmailMessage[] = [];
+
+  // Business account (always runs)
+  const businessMessages = await fetchFromAccount(
+    { clientId, clientSecret, refreshToken },
+    'business'
+  );
+  allMessages.push(...businessMessages);
+
+  // Personal account (optional — only if GMAIL_REFRESH_TOKEN_PERSONAL is set)
+  const personalRefreshToken = process.env.GMAIL_REFRESH_TOKEN_PERSONAL;
+  if (personalRefreshToken) {
+    try {
+      const personalMessages = await fetchFromAccount(
+        { clientId, clientSecret, refreshToken: personalRefreshToken },
+        'personal'
+      );
+      allMessages.push(...personalMessages);
+    } catch (err) {
+      // Personal email failure should not block business email
+      console.error(`Personal Gmail fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return allMessages;
 }
 
 export type { GmailMessage };

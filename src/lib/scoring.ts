@@ -75,7 +75,7 @@ export async function scoreEmails(emails: GmailMessage[]): Promise<ScoredEmail[]
   if (emails.length === 0) return [];
 
   const emailSummaries = emails.map((e, i) => (
-    `[${i}] ID: ${e.id}\nFrom: ${e.from}\nSubject: ${e.subject}\nDate: ${e.date}\nSnippet: ${e.snippet}\nBody preview: ${e.body.slice(0, 500)}`
+    `[${i}] ID: ${e.id}\nAccount: ${e.account || 'business'}\nFrom: ${e.from}\nSubject: ${e.subject}\nDate: ${e.date}\nSnippet: ${e.snippet}\nBody preview: ${e.body.slice(0, 500)}`
   )).join('\n\n---\n\n');
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {

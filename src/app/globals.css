@@ -1,28 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-base: #0a0c12;
-  --color-surface: #10131c;
-  --color-elevated: #181c2a;
-  --color-border: #252a3e;
-  --color-primary: #eef0f6;
-  --color-secondary: #8891ab;
-  --color-accent: #5b9cf5;
-  --color-danger: #f06060;
-  --color-warning: #f0b429;
-  --color-success: #2dd4a8;
-  --color-info: #9b8afb;
+  /* Clinic of AI — Brand Color System */
+  --color-base: #fff8f3;
+  --color-surface: #ffffff;
+  --color-elevated: #f5ede6;
+  --color-border: #e0d5ca;
+  --color-primary: #001215;
+  --color-secondary: #5a6b6e;
+  --color-accent: #a14000;
+  --color-accent-bright: #ff7a32;
+  --color-danger: #b91c1c;
+  --color-warning: #a14000;
+  --color-success: #166534;
+  --color-info: #002a2e;
 
-  /* Extended palette for gradients */
-  --color-accent-dim: #3d6db5;
-  --color-glow: #5b9cf520;
+  /* Dark mode tokens (used for dark-mode variant) */
+  --color-base-dark: #001215;
+  --color-surface-dark: #002a2e;
+  --color-elevated-dark: #003d42;
+  --color-border-dark: #1a4a4f;
+  --color-primary-dark: #fff8f3;
+  --color-secondary-dark: #8fa3a6;
 }
 
 :root {
   --font-inter: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --font-display: 'Space Mono', monospace;
 }
 
 * {
@@ -39,30 +44,18 @@ body {
   color: var(--color-primary);
 }
 
-/* Atmospheric background pattern */
+/* Subtle warm texture — editorial paper feel */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% -20%, var(--color-glow) 0%, transparent 70%),
-    radial-gradient(circle at 80% 50%, rgba(155, 138, 251, 0.04) 0%, transparent 50%);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 0;
+  opacity: 0.5;
 }
 
-/* Noise overlay for texture */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.4;
-}
-
-/* Custom scrollbar styling */
+/* Custom scrollbar styling — warm tones */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -87,10 +80,10 @@ body::after {
   outline-color: var(--color-accent);
 }
 
-/* Selection colors */
+/* Selection — orange diagnostic marker */
 ::selection {
-  background-color: var(--color-accent);
-  color: var(--color-base);
+  background-color: #ff7a3240;
+  color: var(--color-primary);
 }
 
 /* Smooth transitions */
@@ -121,8 +114,8 @@ button, a, input, select, textarea {
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.15); }
-  50% { box-shadow: 0 0 16px 4px rgba(240, 180, 41, 0.08); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(161, 64, 0, 0.12); }
+  50% { box-shadow: 0 0 12px 3px rgba(161, 64, 0, 0.06); }
 }
 
 .animate-fade-up {
@@ -134,7 +127,7 @@ button, a, input, select, textarea {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(91, 156, 245, 0.08) 50%, transparent 75%);
+  background: linear-gradient(90deg, transparent 25%, rgba(161, 64, 0, 0.06) 50%, transparent 75%);
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
 }
@@ -143,11 +136,11 @@ button, a, input, select, textarea {
   animation: pulseGlow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Glass morphism effect for elevated panels */
+/* Editorial panel — warm paper surface */
 .glass {
-  background: rgba(16, 19, 28, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 248, 243, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 /* Tab content transition */
@@ -180,4 +173,20 @@ button, a, input, select, textarea {
 
 .animate-fill {
   animation: fillBar 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Chat widget slide-up */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
