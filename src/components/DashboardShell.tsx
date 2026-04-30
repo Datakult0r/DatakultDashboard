@@ -3,495 +3,157 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import {
-  Shield,
-  AlertCircle,
-  CheckCircle2,
-  Briefcase,
-  Newspaper,
-  Clock,
-  Activity,
-  Send,
-  PhoneOff,
-  ExternalLink,
-  Globe,
-  CalendarDays,
-  Link2,
-  HeartPulse,
+  Zap, Target, Inbox, HeartPulse,
+  Globe, CalendarDays, Link2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { TriageItem, TriageStat, JobApplication, ApplicationStatus } from '@/types/triage';
-import StatCard from './StatCard';
-import TriageCard from './TriageCard';
-import JobCard from './JobCard';
-import NewsCard from './NewsCard';
-import ScheduleRow from './ScheduleRow';
-import ApprovalQueue from './ApprovalQueue';
-import ApplicationTracker from './ApplicationTracker';
-import MissedMeetingCard from './MissedMeetingCard';
-import MissionCriticalBar from './MissionCriticalBar';
-import SystemAlert from './SystemAlert';
+import NowSurface from './NowSurface';
+import PipelineSurface from './PipelineSurface';
+import IntakeSurface from './IntakeSurface';
 import SystemHealthPanel from './SystemHealthPanel';
+import RunwayWidget from './RunwayWidget';
 import ChatWidget from './ChatWidget';
 import ErrorBoundary from './ErrorBoundary';
-import type { MissionItem } from './MissionCriticalBar';
+import SystemAlert from './SystemAlert';
 
-type TabType =
-  | 'missed'
-  | 'approval'
-  | 'action'
-  | 'review'
-  | 'jobs'
-  | 'applications'
-  | 'news'
-  | 'schedule'
-  | 'done'
-  | 'health';
-
+type Surface = 'now' | 'pipeline' | 'intake' | 'health';
 type DateScope = 'today' | '24h' | 'week' | 'all';
 
 interface DashboardShellProps {
-  /** Initial triage items from server */
   initialItems: TriageItem[];
-  /** Initial stats from server */
   initialStats: TriageStat | null;
-  /** Initial job applications from server */
   initialApplications: JobApplication[];
 }
 
+const isPending = (s: string | null | undefined) => s === 'pending_review' || s === 'pending';
+
 /**
- * Main dashboard client component — AG-UI Chatless Generative UI surface
- * The agent prepares actions, Philippe approves/rejects from here
+ * v3.0 — 4-surface command center.
+ * NOW (single best next action) | PIPELINE (customers + jobs) | INTAKE (legacy categories) | HEALTH
  */
-export default function DashboardShell({
-  initialItems,
-  initialStats,
-  initialApplications,
-}: DashboardShellProps) {
+export default function DashboardShell({ initialItems, initialStats, initialApplications }: DashboardShellProps) {
   const [allItems, setAllItems] = useState<TriageItem[]>(initialItems);
   const [stats, setStats] = useState<TriageStat | null>(initialStats);
   const [applications, setApplications] = useState<JobApplication[]>(initialApplications);
   const [dateScope, setDateScope] = useState<DateScope>('week');
-  // Default to missed tab if there are pending missed items, otherwise approval
-  const [activeTab, setActiveTab] = useState<TabType>(
-    initialItems.some(
-      (i) =>
-        i.tags?.includes('missed') &&
-        (i.action_status === 'pending_review' || (i.action_status as string) === 'pending')
-    )
-      ? 'missed'
-      : 'approval'
-  );
+  const [activeSurface, setActiveSurface] = useState<Surface>('now');
   const [now, setNow] = useState(new Date());
 
-  // Date-scoped slice of items (everything except Health tab uses this)
+  // Tick clock
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Realtime: triage_items
+  useEffect(() => {
+    const sub = supabase
+      .channel('triage_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'triage_items' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setAllItems((prev) => [payload.new as TriageItem, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setAllItems((prev) =>
+            prev.map((i) => (i.id === (payload.new as TriageItem).id ? (payload.new as TriageItem) : i)),
+          );
+        } else if (payload.eventType === 'DELETE') {
+          setAllItems((prev) => prev.filter((i) => i.id !== (payload.old as TriageItem).id));
+        }
+      })
+      .subscribe();
+    return () => { sub.unsubscribe(); };
+  }, []);
+
+  // Realtime: job_applications
+  useEffect(() => {
+    const sub = supabase
+      .channel('application_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_applications' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setApplications((prev) => [payload.new as JobApplication, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setApplications((prev) =>
+            prev.map((a) => (a.id === (payload.new as JobApplication).id ? (payload.new as JobApplication) : a)),
+          );
+        } else if (payload.eventType === 'DELETE') {
+          setApplications((prev) => prev.filter((a) => a.id !== (payload.old as JobApplication).id));
+        }
+      })
+      .subscribe();
+    return () => { sub.unsubscribe(); };
+  }, []);
+
+  // Date-scoped slice
   const items = useMemo(() => {
     if (dateScope === 'all') return allItems;
-    const cutoff = (() => {
-      const d = new Date();
-      if (dateScope === 'today') {
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
-      if (dateScope === '24h') {
-        d.setHours(d.getHours() - 24);
-        return d;
-      }
-      // week
-      d.setDate(d.getDate() - 7);
-      d.setHours(0, 0, 0, 0);
-      return d;
-    })();
+    const cutoff = new Date();
+    if (dateScope === 'today') cutoff.setHours(0, 0, 0, 0);
+    else if (dateScope === '24h') cutoff.setHours(cutoff.getHours() - 24);
+    else { cutoff.setDate(cutoff.getDate() - 7); cutoff.setHours(0, 0, 0, 0); }
     return allItems.filter((i) => new Date(i.created_at) >= cutoff);
   }, [allItems, dateScope]);
 
-  // Wrappers that mutate the canonical state
-  const setItems = useCallback(
-    (updater: TriageItem[] | ((prev: TriageItem[]) => TriageItem[])) => {
-      setAllItems(typeof updater === 'function' ? (updater as (prev: TriageItem[]) => TriageItem[]) : () => updater);
-    },
-    []
-  );
-
-  // Update current time for schedule highlighting
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(timer);
+  // Action handlers — single canonical writer set
+  const handleApprove = useCallback(async (id: string) => {
+    const r = await fetch('/api/actions/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!r.ok) throw new Error('Failed to approve');
+    setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'approved' as const } : i)));
   }, []);
 
-  // Set up realtime subscription
-  useEffect(() => {
-    const subscription = supabase
-      .channel('triage_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'triage_items',
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setItems((prev) => [payload.new as TriageItem, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setItems((prev) =>
-              prev.map((item) =>
-                item.id === (payload.new as TriageItem).id
-                  ? (payload.new as TriageItem)
-                  : item
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setItems((prev) =>
-              prev.filter((item) => item.id !== (payload.old as TriageItem).id)
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+  const handleReject = useCallback(async (id: string) => {
+    const r = await fetch('/api/actions/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!r.ok) throw new Error('Failed to reject');
+    setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'rejected' as const } : i)));
   }, []);
 
-  // Realtime subscription for job_applications
-  useEffect(() => {
-    const subscription = supabase
-      .channel('application_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_applications',
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setApplications((prev) => [payload.new as JobApplication, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setApplications((prev) =>
-              prev.map((app) =>
-                app.id === (payload.new as JobApplication).id
-                  ? (payload.new as JobApplication)
-                  : app
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setApplications((prev) =>
-              prev.filter((app) => app.id !== (payload.old as JobApplication).id)
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+  const handleMarkFollowedUp = useCallback(async (id: string) => {
+    // Resets the SLA clock by clearing follow_up_at and stamping last_follow_up_at
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from('triage_items')
+      .update({ follow_up_at: null, last_follow_up_at: nowIso, action_status: 'executed' })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
   }, []);
 
-  // Application status change handler
   const handleApplicationStatusChange = useCallback(async (id: string, status: ApplicationStatus) => {
-    // Optimistic update
     setApplications((prev) =>
-      prev.map((app) =>
-        app.id === id ? { ...app, status, last_activity_date: new Date().toISOString().split('T')[0] } : app
-      )
+      prev.map((a) =>
+        a.id === id ? { ...a, status, last_activity_date: new Date().toISOString().split('T')[0] } : a,
+      ),
     );
-    const res = await fetch('/api/applications/status', {
+    const r = await fetch('/api/applications/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status }),
     });
-    if (!res.ok) {
-      console.error('Failed to update application status');
-      // Revert on failure — refetch
+    if (!r.ok) {
       const { data } = await supabase.from('job_applications').select('*').order('applied_date', { ascending: false });
       if (data) setApplications(data as JobApplication[]);
     }
   }, []);
 
-  // A2UI: Approve action
-  const handleApprove = useCallback(async (id: string) => {
-    const res = await fetch('/api/actions/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) throw new Error('Failed to approve');
-    // Optimistic update
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, action_status: 'approved' as const } : item
-      )
-    );
-  }, []);
+  // Counters for tab badges
+  const pendingCount = items.filter((i) => i.action_type !== null && isPending(i.action_status) && !i.tags?.includes('missed')).length;
+  const missedPendingCount = items.filter((i) => i.tags?.includes('missed') && isPending(i.action_status)).length;
+  const intakeBadge = pendingCount + missedPendingCount;
 
-  // A2UI: Reject action
-  const handleReject = useCallback(async (id: string) => {
-    const res = await fetch('/api/actions/reject', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) throw new Error('Failed to reject');
-    // Optimistic update
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, action_status: 'rejected' as const } : item
-      )
-    );
-  }, []);
-
-  // Category filters
-  const getItemsByCategory = (category: string) => {
-    return items.filter((item) => item.category === category && item.status !== 'skipped');
-  };
-
-  // Defensive: treat both 'pending_review' (canonical) and 'pending' (legacy) as pending.
-  const isPendingReview = (s: string | null | undefined) =>
-    s === 'pending_review' || s === 'pending';
-  const missedItems = items.filter((i) => i.tags?.includes('missed'));
-  const missedPending = missedItems.filter((i) => isPendingReview(i.action_status));
-  const actionableItems = items.filter((i) => i.action_type !== null && !i.tags?.includes('missed'));
-  const pendingActions = actionableItems.filter((i) => isPendingReview(i.action_status));
-  const urgentItems = getItemsByCategory('urgent').filter((i) => !i.tags?.includes('missed'));
-  const reviewItems = getItemsByCategory('review');
-  const jobItems = getItemsByCategory('job');
-  const newsItems = getItemsByCategory('news');
-  const scheduleItems = getItemsByCategory('schedule');
-  const doneItems = items.filter(
-    (item) => item.category === 'done' || item.status === 'completed'
-  );
-  const activeApplications = applications.filter(
-    (a) => !['rejected', 'ghosted', 'withdrawn'].includes(a.status)
-  );
-
-  // ── Mission-Critical Focus Items ──
-  // Derive from pipeline contacts, high-priority items, and strategic deadlines
-  const missionItems: MissionItem[] = (() => {
-    const missions: MissionItem[] = [];
-
-    // 1. Pipeline deals (applications in interview/screening stage)
-    const pipelineDeals = applications.filter((a) =>
-      ['interview', 'screening'].includes(a.status)
-    );
-    if (pipelineDeals.length > 0) {
-      const topDeal = pipelineDeals[0];
-      missions.push({
-        id: 'pipeline-active',
-        title: `${topDeal.company} — ${topDeal.role}`,
-        subtitle: `${pipelineDeals.length} active pipeline deal${pipelineDeals.length > 1 ? 's' : ''}. Status: ${topDeal.status}. ${topDeal.contact_name ? `Contact: ${topDeal.contact_name}` : ''}`,
-        urgency: topDeal.status === 'interview' ? 'critical' : 'high',
-        link: topDeal.job_url || topDeal.contact_url || undefined,
-        metric: `${pipelineDeals.length} in pipeline`,
-      });
-    }
-
-    // 2. Highest priority pending approval items
-    const criticalPending = pendingActions
-      .filter((i) => (i.priority || 0) >= 8)
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
-    if (criticalPending.length > 0) {
-      missions.push({
-        id: 'urgent-approvals',
-        title: `${criticalPending.length} high-priority action${criticalPending.length > 1 ? 's' : ''} pending`,
-        subtitle: criticalPending.slice(0, 2).map((i) => i.title).join(' · '),
-        urgency: 'critical',
-        metric: `Priority ${criticalPending[0].priority}+`,
-      });
-    }
-
-    // 3. Job search momentum
-    const recentJobs = jobItems.filter((j) => j.score && j.score >= 65);
-    const totalApps = applications.length;
-    if (recentJobs.length > 0 || totalApps > 0) {
-      missions.push({
-        id: 'job-momentum',
-        title: 'Job Search Momentum',
-        subtitle: `${recentJobs.length} strong matches today. ${totalApps} total applications tracked.`,
-        urgency: recentJobs.length >= 3 ? 'high' : 'tracking',
-        progress: Math.min(Math.round((activeApplications.length / Math.max(totalApps, 1)) * 100), 100),
-        metric: `${activeApplications.length} active / ${totalApps} total`,
-      });
-    }
-
-    return missions.slice(0, 3);
-  })();
-
-  // Tab configuration — Missed meetings first when they exist, then Approval Queue
-  const tabs: { id: TabType; label: string; icon: React.ReactNode; count: number; pulse?: boolean; danger?: boolean }[] = [
-    ...(missedItems.length > 0 ? [{ id: 'missed' as TabType, label: 'Missed', icon: <PhoneOff size={16} />, count: missedPending.length, pulse: missedPending.length > 0, danger: missedPending.length > 0 }] : []),
-    { id: 'approval', label: 'Approve', icon: <Shield size={16} />, count: pendingActions.length, pulse: pendingActions.length > 0 },
-    { id: 'action', label: 'Action', icon: <AlertCircle size={16} />, count: urgentItems.length },
-    { id: 'review', label: 'Review', icon: <Activity size={16} />, count: reviewItems.length },
-    { id: 'jobs', label: 'Jobs', icon: <Briefcase size={16} />, count: jobItems.length },
-    { id: 'applications', label: 'Pipeline', icon: <Send size={16} />, count: activeApplications.length },
-    { id: 'news', label: 'News', icon: <Newspaper size={16} />, count: newsItems.length },
-    { id: 'schedule', label: 'Schedule', icon: <Clock size={16} />, count: scheduleItems.length },
-    { id: 'done', label: 'Done', icon: <CheckCircle2 size={16} />, count: doneItems.length },
-    { id: 'health', label: 'Health', icon: <HeartPulse size={16} />, count: 0 },
+  const surfaces: { id: Surface; label: string; icon: React.ReactNode; badge?: number; pulse?: boolean }[] = [
+    { id: 'now', label: 'Now', icon: <Zap size={16} />, badge: intakeBadge, pulse: missedPendingCount > 0 },
+    { id: 'pipeline', label: 'Pipeline', icon: <Target size={16} />, badge: applications.filter((a) => !['rejected','ghosted','withdrawn'].includes(a.status)).length },
+    { id: 'intake', label: 'Intake', icon: <Inbox size={16} />, badge: items.length },
+    { id: 'health', label: 'Health', icon: <HeartPulse size={16} /> },
   ];
 
-  // Render tab content
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'missed':
-        return (
-          <div className="space-y-4">
-            {missedItems.length === 0 ? (
-              <EmptyState message="No missed meetings. You're all caught up!" />
-            ) : (
-              <>
-                <div className="bg-danger/5 border border-danger/20 rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-semibold text-danger flex items-center gap-2 mb-1">
-                    <PhoneOff size={16} />
-                    {missedPending.length} meetings need apology messages
-                  </h3>
-                  <p className="text-xs text-secondary">
-                    Review each draft, click &quot;Send Apology&quot; to queue it, or copy the message to send manually via LinkedIn.
-                  </p>
-                </div>
-                <div className="grid gap-3">
-                  {missedItems
-                    .sort((a, b) => (b.priority || 0) - (a.priority || 0))
-                    .map((item, i) => (
-                      <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                        <MissedMeetingCard
-                          item={item}
-                          onApprove={handleApprove}
-                          onReject={handleReject}
-                        />
-                      </div>
-                    ))}
-                </div>
-              </>
-            )}
-          </div>
-        );
-
-      case 'approval':
-        return (
-          <ApprovalQueue
-            items={actionableItems}
-            onApprove={handleApprove}
-            onReject={handleReject}
-          />
-        );
-
-      case 'action':
-        return (
-          <div className="grid gap-3">
-            {urgentItems.length === 0 ? (
-              <EmptyState message="No urgent items. Great job!" />
-            ) : (
-              urgentItems.map((item, i) => (
-                <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                  <TriageCard item={item} />
-                </div>
-              ))
-            )}
-          </div>
-        );
-
-      case 'review':
-        return (
-          <div className="grid gap-3">
-            {reviewItems.length === 0 ? (
-              <EmptyState message="Nothing to review." />
-            ) : (
-              reviewItems.map((item, i) => (
-                <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                  <TriageCard item={item} />
-                </div>
-              ))
-            )}
-          </div>
-        );
-
-      case 'jobs':
-        return (
-          <div className="grid gap-3 md:grid-cols-2">
-            {jobItems.length === 0 ? (
-              <EmptyState message="No jobs in pipeline." />
-            ) : (
-              jobItems.map((item, i) => (
-                <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                  <JobCard item={item} />
-                </div>
-              ))
-            )}
-          </div>
-        );
-
-      case 'applications':
-        return (
-          <ApplicationTracker
-            applications={applications}
-            onStatusChange={handleApplicationStatusChange}
-          />
-        );
-
-      case 'news':
-        return (
-          <div className="grid gap-3">
-            {newsItems.length === 0 ? (
-              <EmptyState message="No news items." />
-            ) : (
-              newsItems.map((item, i) => (
-                <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                  <NewsCard item={item} />
-                </div>
-              ))
-            )}
-          </div>
-        );
-
-      case 'schedule':
-        return (
-          <div className="grid gap-3">
-            {scheduleItems.length === 0 ? (
-              <EmptyState message="No scheduled events." />
-            ) : (
-              scheduleItems
-                .sort(
-                  (a, b) =>
-                    new Date(a.event_time || 0).getTime() -
-                    new Date(b.event_time || 0).getTime()
-                )
-                .map((item, i) => (
-                  <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                    <ScheduleRow item={item} now={now} />
-                  </div>
-                ))
-            )}
-          </div>
-        );
-
-      case 'done':
-        return (
-          <div className="grid gap-3">
-            {doneItems.length === 0 ? (
-              <EmptyState message="No completed items yet." />
-            ) : (
-              doneItems.slice(0, 20).map((item, i) => (
-                <div key={item.id} className={`animate-fade-up stagger-${Math.min(i + 1, 5)}`}>
-                  <TriageCard item={item} />
-                </div>
-              ))
-            )}
-          </div>
-        );
-
-      case 'health':
-        return <SystemHealthPanel />;
-
-      default:
-        return null;
-    }
-  };
-
-  // Date scope filter pills
   const scopeOptions: { id: DateScope; label: string }[] = [
     { id: 'today', label: 'Today' },
     { id: '24h', label: '24h' },
@@ -499,14 +161,38 @@ export default function DashboardShell({
     { id: 'all', label: 'All' },
   ];
 
+  const renderSurface = () => {
+    switch (activeSurface) {
+      case 'now':
+        return (
+          <NowSurface
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onMarkFollowedUp={handleMarkFollowedUp}
+          />
+        );
+      case 'pipeline':
+        return (
+          <PipelineSurface
+            applications={applications}
+            onApplicationStatusChange={handleApplicationStatusChange}
+          />
+        );
+      case 'intake':
+        return <IntakeSurface items={items} onApprove={handleApprove} onReject={handleReject} />;
+      case 'health':
+        return <SystemHealthPanel />;
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col relative z-10">
-      {/* Header — refined with atmospheric gradient */}
-      <header className="glass border-b border-border/60 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-          <div className="flex items-center justify-between">
+      {/* Header */}
+      <header className="glass border-b sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] tracking-[0.25em] uppercase text-secondary font-mono">
+              <p className="text-[10px] tracking-[0.25em] uppercase text-tertiary font-mono">
                 01 — Clinic of AI
               </p>
               <h1 className="text-2xl sm:text-3xl font-semibold text-primary mt-1 tracking-tight">
@@ -514,42 +200,10 @@ export default function DashboardShell({
               </h1>
             </div>
 
-            {/* Quick-action links */}
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-1.5">
-                <a
-                  href="https://www.linkedin.com/messaging/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-info/10 text-info hover:bg-info/20 border border-info/20 transition-colors"
-                  title="Open LinkedIn Messages"
-                >
-                  <Globe size={13} />
-                  DMs
-                </a>
-                <a
-                  href="https://calendar.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20 transition-colors"
-                  title="Open Google Calendar"
-                >
-                  <CalendarDays size={13} />
-                  Calendar
-                </a>
-                <a
-                  href="https://cal.read.ai/philippe-datakult/30-min"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-success/10 text-success hover:bg-success/20 border border-success/20 transition-colors"
-                  title="Share booking link"
-                >
-                  <Link2 size={13} />
-                  Book
-                </a>
-              </div>
-              {/* Date scope filter — controls what date range the tabs show */}
-              <div className="hidden md:flex items-center gap-0.5 ml-3 bg-elevated/40 border border-border/40 rounded-md p-0.5">
+              <RunwayWidget />
+
+              <div className="hidden md:flex items-center gap-0.5 bg-elevated/40 border border-border rounded-md p-0.5">
                 {scopeOptions.map((opt) => (
                   <button
                     key={opt.id}
@@ -558,7 +212,7 @@ export default function DashboardShell({
                     className={`px-2 py-1 text-[11px] font-mono uppercase tracking-wider rounded transition-colors ${
                       dateScope === opt.id
                         ? 'bg-accent/20 text-accent'
-                        : 'text-secondary hover:text-primary hover:bg-elevated/60'
+                        : 'text-tertiary hover:text-secondary hover:bg-elevated'
                     }`}
                   >
                     {opt.label}
@@ -566,123 +220,62 @@ export default function DashboardShell({
                 ))}
               </div>
 
-              <div className="text-right ml-3">
-                <p className="text-xs text-secondary font-mono">
-                  {format(new Date(), 'EEEE')}
-                </p>
-                <p className="text-sm text-primary font-semibold">
-                  {format(new Date(), 'MMM d, yyyy')}
-                </p>
+              <div className="hidden sm:flex items-center gap-1.5">
+                <a href="https://www.linkedin.com/messaging/" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-info/10 text-info hover:bg-info/20 border border-info/20">
+                  <Globe size={13} /> DMs
+                </a>
+                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-elevated text-secondary hover:text-primary border border-border">
+                  <CalendarDays size={13} /> Cal
+                </a>
+                <a href="https://cal.read.ai/philippe-datakult/30-min" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20">
+                  <Link2 size={13} /> Book
+                </a>
+              </div>
+
+              <div className="text-right ml-2">
+                <p className="text-[11px] text-tertiary font-mono">{format(now, 'EEE')}</p>
+                <p className="text-sm text-primary font-semibold">{format(now, 'MMM d')}</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Stats row — refined cards */}
-      <div className="glass border-b border-border/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className={`grid grid-cols-2 gap-2 ${missedPending.length > 0 ? 'sm:grid-cols-6' : 'sm:grid-cols-5'} sm:gap-3`}>
-            {missedPending.length > 0 && (
-              <StatCard
-                number={missedPending.length}
-                label="Missed"
-                bgColor="bg-danger/12"
-                numberColor="text-danger"
-                icon={<PhoneOff size={18} className="text-danger animate-pulse" />}
-              />
-            )}
-            <StatCard
-              number={stats?.pending_actions_count ?? pendingActions.length}
-              label="To Approve"
-              bgColor="bg-warning/8"
-              numberColor="text-warning"
-              icon={<Shield size={18} className="text-warning" />}
-            />
-            <StatCard
-              number={stats?.urgent_count || urgentItems.length}
-              label="Urgent"
-              bgColor="bg-danger/8"
-              numberColor="text-danger"
-              icon={<AlertCircle size={18} className="text-danger" />}
-            />
-            <StatCard
-              number={stats?.in_progress_count || 0}
-              label="In Progress"
-              bgColor="bg-info/8"
-              numberColor="text-info"
-              icon={<Activity size={18} className="text-info" />}
-            />
-            <StatCard
-              number={stats?.job_count || jobItems.length}
-              label="Jobs"
-              bgColor="bg-accent/8"
-              numberColor="text-accent"
-              icon={<Briefcase size={18} className="text-accent" />}
-            />
-            <StatCard
-              number={stats?.done_count || doneItems.length}
-              label="Done"
-              bgColor="bg-success/8"
-              numberColor="text-success"
-              icon={<CheckCircle2 size={18} className="text-success" />}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Mission-Critical Focus Bar — always visible */}
-      {missionItems.length > 0 && (
-        <MissionCriticalBar items={missionItems} />
-      )}
-
-      {/* Tab navigation — elevated with glass effect */}
-      <div className="glass border-b border-border/40 sticky top-[73px] sm:top-[81px] z-40">
+      {/* Surface tabs */}
+      <div className="glass border-b sticky top-[73px] sm:top-[81px] z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-0.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-            {tabs.map((tab) => {
-              const isDanger = 'danger' in tab && tab.danger;
-              const activeColor = isDanger ? 'border-danger text-danger' : 'border-accent text-accent';
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    relative flex items-center gap-1.5 px-3 sm:px-4 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-2
-                    ${activeTab === tab.id
-                      ? activeColor
-                      : 'border-transparent text-secondary hover:text-primary'
-                    }
-                    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
-                  `}
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                  {tab.count > 0 && (
-                    <span className={`
-                      ml-0.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-mono font-semibold
-                      ${isDanger
-                        ? 'bg-danger/20 text-danger animate-pulse-glow'
-                        : tab.pulse
-                          ? 'bg-warning/20 text-warning animate-pulse-glow'
-                          : activeTab === tab.id
-                            ? 'bg-accent/15 text-accent'
-                            : 'bg-elevated text-secondary'
-                      }
-                    `}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="flex gap-1 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            {surfaces.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setActiveSurface(s.id)}
+                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
+                  activeSurface === s.id
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-secondary hover:text-primary'
+                } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+              >
+                {s.icon}
+                <span>{s.label}</span>
+                {typeof s.badge === 'number' && s.badge > 0 && (
+                  <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-mono font-semibold ${
+                    s.pulse ? 'bg-danger/20 text-danger animate-pulse-glow' :
+                    activeSurface === s.id ? 'bg-accent/15 text-accent' : 'bg-elevated text-tertiary'
+                  }`}>
+                    {s.badge}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Content area with tab transition */}
+      {/* Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* System alerts */}
         {items.some((i) => i.notes?.includes('0 credits') || i.notes?.includes('no_credits') || i.notes?.includes('No Browser Use')) && (
           <div className="mb-4">
             <SystemAlert
@@ -694,42 +287,28 @@ export default function DashboardShell({
           </div>
         )}
 
-        <ErrorBoundary label={activeTab}>
-          <div key={activeTab} className="animate-tab-enter">
-            {renderTabContent()}
+        <ErrorBoundary label={activeSurface}>
+          <div key={activeSurface} className="animate-tab-enter">
+            {renderSurface()}
           </div>
         </ErrorBoundary>
       </main>
 
       {/* Footer */}
-      <footer className="glass border-t border-border/40 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-xs text-secondary/60">
-          <span className="text-[10px] tracking-[0.15em] uppercase font-mono">
-            AG-UI · Chatless Surface · Scope: {dateScope.toUpperCase()}
+      <footer className="glass border-t mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-[11px] text-tertiary font-mono">
+          <span className="text-[10px] tracking-[0.15em] uppercase">
+            Operator · {dateScope.toUpperCase()} · {stats?.pending_actions_count ?? pendingCount} pending
           </span>
           <div className="flex items-center gap-3">
-            <span className="font-mono">
-              Live · {format(now, 'HH:mm:ss')}
-            </span>
-            <span className="text-secondary/30">|</span>
-            <span className="font-mono text-[10px]">
-              {items.length}/{allItems.length} items · {applications.length} apps
-            </span>
+            <span>Live · {format(now, 'HH:mm:ss')}</span>
+            <span className="opacity-30">|</span>
+            <span>{items.length}/{allItems.length} items · {applications.length} apps</span>
           </div>
         </div>
       </footer>
 
-      {/* Chat widget — natural language dashboard assistant */}
       <ChatWidget items={items} applications={applications} stats={stats} />
-    </div>
-  );
-}
-
-/** Empty state component for tabs with no items */
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="text-center py-16 animate-fade-in">
-      <p className="text-secondary text-sm">{message}</p>
     </div>
   );
 }

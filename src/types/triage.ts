@@ -84,18 +84,16 @@ export interface TriageItem {
   priority: number | null;
   triage_date: string | null;
   notes: string | null;
-  /** A2UI: Type of action the agent prepared */
   action_type: ActionType;
-  /** A2UI: Structured data for action execution */
   action_payload: ActionPayload | null;
-  /** A2UI: Current status of the action */
   action_status: ActionStatus;
-  /** Generated cover letter for job applications */
   cover_letter: string | null;
-  /** CV customization notes for this role */
   tailored_cv_notes: string | null;
-  /** URL to tailored CV PDF in Supabase storage */
   tailored_cv_url: string | null;
+  /** v3.0: SLA — when the human committed to follow up by */
+  follow_up_at: string | null;
+  /** v3.0: SLA — when the last follow-up actually happened */
+  last_follow_up_at: string | null;
 }
 
 export interface TriageStat {
@@ -125,6 +123,100 @@ export interface SystemHealthRow {
   fallback_used: string | null;
   created_at: string;
   recency_rank: number;
+}
+
+/** Customer pipeline stages */
+export type EngagementStage = 'lead' | 'discovery' | 'proposal' | 'won' | 'lost' | 'paused';
+
+/** A customer engagement — separate from job_applications (which is the recruiter pipeline) */
+export interface CustomerEngagement {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  company: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_url: string | null;
+  stage: EngagementStage;
+  source: string | null;
+  value_eur: number | null;
+  probability: number | null;
+  next_step: string | null;
+  next_step_at: string | null;
+  notes: string | null;
+  tags: string[] | null;
+  triage_id: string | null;
+}
+
+/** Monthly revenue/expenses for runway calc */
+export interface MonthlyFinance {
+  month: string;
+  revenue_eur: number;
+  expenses_eur: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Aggregated runway metric returned by /api/runway */
+export interface RunwayMetrics {
+  current_month: string;
+  current_month_revenue_eur: number;
+  current_month_expenses_eur: number;
+  current_month_net_eur: number;
+  trailing_3mo_avg_burn_eur: number;
+  runway_months: number | null;
+  cash_floor_eur: number;
+  days_since_last_buyer_touch: number | null;
+}
+
+/** Row from sla_breaches view */
+export interface SLABreach {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  source: string;
+  category: string;
+  action_type: ActionType;
+  action_status: ActionStatus;
+  priority: number | null;
+  score: number | null;
+  contact_name: string | null;
+  contact_url: string | null;
+  follow_up_at: string;
+  hours_overdue: number;
+  days_overdue: number;
+}
+
+/** Row from next_actions view */
+export interface NextAction {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  source: string;
+  category: string;
+  action_type: ActionType;
+  action_status: ActionStatus;
+  priority: number | null;
+  score: number | null;
+  contact_name: string | null;
+  contact_url: string | null;
+  draft_reply: string | null;
+  cover_letter: string | null;
+  created_at: string;
+  follow_up_at: string | null;
+  reason: 'pending_review' | 'sla_breach';
+  rank_score: number;
+  reason_priority: number;
+}
+
+/** Row from pipeline_health view */
+export interface PipelineHealthRow {
+  stage: EngagementStage;
+  count: number;
+  total_value_eur: number;
+  weighted_value_eur: number;
+  last_activity: string;
 }
 
 export interface TriageItemsByCategory {

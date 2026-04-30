@@ -4,6 +4,22 @@
 - **URL**: https://datakult-dashboard.vercel.app
 - **Vercel**: Production on `master` branch, CoAI team
 
+## 2026-04-30 — Control Tower v3.0 (4-surface command center)
+
+### What changed
+- **Palette rewrite** — "Operator" dark editorial. Sage accent (focus), gold (money), coral (SLA breach), amber (warning), green (success). One color = one meaning. Replaces light cream palette where accent and warning collided.
+- **10 tabs → 4 surfaces** — `NOW` (single best next action), `PIPELINE` (Customers + Job Apps), `INTAKE` (legacy categories as sub-tabs), `HEALTH`.
+- **NOW surface** — hero card with the most important next action + 5 follow-ups. Reads from new `next_actions` SQL view.
+- **PIPELINE surface** — new `customer_engagements` table + Kanban tracker (Lead → Discovery → Proposal → Won/Lost) with weighted ARR. Inline editing, stage advancement, value/probability tracking.
+- **Runway widget** — header chip: month revenue · runway months · days since last buyer touch. New `monthly_finance` table + `/api/runway` computed metrics.
+- **SLA tracking** — every approve sets `follow_up_at` (default 3d, configurable per action_type). New `sla_breaches` view. NowSurface surfaces overdue follow-ups as breaches.
+- **Idempotency** — unique partial index on `(source, source_url, triage_date)` prevents duplicate inserts on cron retries.
+- **New components** (uniform style): `NowSurface`, `RunwayWidget`, `EngagementCard`, `EngagementTracker`, `PipelineSurface`, `IntakeSurface`, `SLABadge`.
+- **New API routes**: `/api/engagements`, `/api/engagements/[id]`, `/api/finance`, `/api/runway`. All standardized (force-dynamic, nodejs runtime, identical error shape).
+
+### Outstanding
+- Gmail OAuth refresh token still revoked (see project_control_tower_v21.md).
+
 ## 2026-04-30 — Control Tower v2.1 (data-drift fix + Health tab + Today filter)
 
 ### Why this matters
