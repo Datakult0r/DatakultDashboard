@@ -10,9 +10,11 @@ import {
   PauseCircle,
   Clock,
   RefreshCw,
+  Play,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SystemHealthRow } from '@/types/triage';
+import { useToast } from './Toast';
 
 /**
  * SystemHealthPanel — Operational visibility into the triage automation pipeline.
@@ -26,6 +28,24 @@ export default function SystemHealthPanel() {
   const [rows, setRows] = useState<SystemHealthRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [running, setRunning] = useState(false);
+  const toast = useToast();
+
+  const runApproved = async () => {
+    if (!confirm('Mark all approved items as executed (clears the SLA queue)?')) return;
+    setRunning(true);
+    try {
+      const r = await fetch('/api/actions/run-approved', { method: 'POST' });
+      const data = await r.json();
+      if (r.ok) {
+        toast.push('success', `Executed ${data.executed} item${data.executed === 1 ? '' : 's'}`);
+      } else {
+        toast.push('error', data.error || 'Failed to run');
+      }
+    } finally {
+      setRunning(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -100,15 +120,26 @@ export default function SystemHealthPanel() {
               )}
             </p>
           </div>
-          <button
-            onClick={() => setRefreshKey((k) => k + 1)}
-            disabled={loading}
-            className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary hover:bg-elevated/80 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
-            aria-label="Refresh health"
-          >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={runApproved}
+              disabled={running}
+              className="text-xs px-2 py-1 rounded bg-money/10 text-money hover:bg-money/20 border border-money/30 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+              title="Mark all approved items as executed and clear their SLA timers"
+            >
+              <Play size={12} />
+              Run approved
+            </button>
+            <button
+              onClick={() => setRefreshKey((k) => k + 1)}
+              disabled={loading}
+              className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary hover:bg-elevated/80 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+              aria-label="Refresh health"
+            >
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-5 gap-2">

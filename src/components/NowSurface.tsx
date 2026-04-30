@@ -8,6 +8,7 @@ import type { NextAction } from '@/types/triage';
 import SLABadge from './SLABadge';
 import WeeklyWinsBar from './WeeklyWinsBar';
 import OutboundCounter from './OutboundCounter';
+import { useToast } from './Toast';
 
 interface NowSurfaceProps {
   onApprove: (id: string) => Promise<void>;
@@ -24,12 +25,41 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
   const [actions, setActions] = useState<NextAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const toast = useToast();
 
   const reload = async () => {
     setLoading(true);
     const { data, error } = await supabase.from('next_actions').select('*').limit(10);
     if (!error) setActions((data ?? []) as NextAction[]);
     setLoading(false);
+  };
+
+  // Promote a triage_item action into a customer_engagement
+  const handlePromote = async (a: NextAction) => {
+    setBusy(a.id);
+    try {
+      const company = a.contact_name || a.title.split(/[—–-]/)[0].trim();
+      const r = await fetch('/api/engagements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company,
+          contact_name: a.contact_name,
+          contact_url: a.contact_url,
+          source: a.source,
+          stage: 'lead',
+          notes: a.subtitle || a.title,
+          triage_id: a.id,
+        }),
+      });
+      if (r.ok) {
+        toast.push('success', `Promoted to engagement: ${company}`);
+      } else {
+        toast.push('error', 'Failed to promote');
+      }
+    } finally {
+      setBusy(null);
+    }
   };
 
   useEffect(() => {
@@ -98,6 +128,7 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
             onApprove={() => handleApprove(hero.id)}
             onReject={() => handleReject(hero.id)}
             onMark={() => handleMark(hero.id)}
+            onPromote={() => handlePromote(hero)}
           />
           {followUps.length > 0 && (
             <div>
@@ -131,6 +162,7 @@ interface CardProps {
   onApprove: () => void;
   onReject: () => void;
   onMark: () => void;
+  onPromote?: () => void;
 }
 
 function reasonMeta(reason: NextAction['reason']) {
@@ -142,10 +174,13 @@ function reasonMeta(reason: NextAction['reason']) {
   }
 }
 
-function HeroCard({ action, busy, onApprove, onReject, onMark }: CardProps) {
+function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: CardProps) {
   const meta = reasonMeta(action.reason);
   const Icon = meta.icon;
   const isBreach = action.reason === 'sla_breach';
+  const promotable =
+    action.reason !== 'engagement_due' &&
+    ['gmail','email','linkedin','linkedin_dm','beeper'].includes((action.source || '').toLowerCase());
   return (
     <div className="hero-card rounded-xl p-6 animate-fade-up">
       <div className="flex items-start justify-between gap-4 mb-4">
@@ -211,6 +246,17 @@ function HeroCard({ action, busy, onApprove, onReject, onMark }: CardProps) {
           <X size={14} />
           Skip
         </button>
+        {promotable && onPromote && (
+          <button
+            onClick={onPromote}
+            disabled={busy}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-money border border-money/30 hover:bg-money/10 rounded-md disabled:opacity-50"
+            title="Create a customer engagement from this item"
+          >
+            <Target size={14} />
+            Promote
+          </button>
+        )}
         {action.contact_url && (
           <a
             href={action.contact_url}

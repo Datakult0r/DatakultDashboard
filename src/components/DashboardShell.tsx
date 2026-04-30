@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import {
   Zap, Target, Inbox, HeartPulse,
-  Globe, CalendarDays, Link2,
+  Globe, CalendarDays, Link2, Command,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { TriageItem, TriageStat, JobApplication, ApplicationStatus } from '@/types/triage';
@@ -16,6 +16,8 @@ import RunwayWidget from './RunwayWidget';
 import ChatWidget from './ChatWidget';
 import ErrorBoundary from './ErrorBoundary';
 import SystemAlert from './SystemAlert';
+import CommandPalette, { PaletteIcons, type PaletteCommand } from './CommandPalette';
+import { useToast } from './Toast';
 
 type Surface = 'now' | 'pipeline' | 'intake' | 'health';
 type DateScope = 'today' | '24h' | 'week' | 'all';
@@ -39,12 +41,64 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   const [dateScope, setDateScope] = useState<DateScope>('week');
   const [activeSurface, setActiveSurface] = useState<Surface>('now');
   const [now, setNow] = useState(new Date());
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const toast = useToast();
 
   // Tick clock
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const isTyping = (el: EventTarget | null) => {
+      const t = el as HTMLElement | null;
+      if (!t) return false;
+      const tag = t.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || (t as HTMLElement).isContentEditable;
+    };
+    let goPending = false;
+    let goTimer: number | null = null;
+    const cancelGo = () => {
+      goPending = false;
+      if (goTimer) { clearTimeout(goTimer); goTimer = null; }
+    };
+
+    const handler = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+K opens the palette regardless of input focus
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((p) => !p);
+        return;
+      }
+      if (paletteOpen) return; // palette handles its own keys
+      if (isTyping(e.target)) return;
+
+      if (e.key === '?') {
+        e.preventDefault();
+        toast.push('info', 'Shortcuts: g+n/p/i/h tab nav · k command palette · o log outbound');
+        return;
+      }
+
+      if (e.key === 'g' && !goPending) {
+        goPending = true;
+        goTimer = window.setTimeout(cancelGo, 1200);
+        return;
+      }
+      if (goPending) {
+        const k = e.key.toLowerCase();
+        if (k === 'n') { setActiveSurface('now'); cancelGo(); e.preventDefault(); return; }
+        if (k === 'p') { setActiveSurface('pipeline'); cancelGo(); e.preventDefault(); return; }
+        if (k === 'i') { setActiveSurface('intake'); cancelGo(); e.preventDefault(); return; }
+        if (k === 'h') { setActiveSurface('health'); cancelGo(); e.preventDefault(); return; }
+        cancelGo();
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [paletteOpen, toast]);
 
   // Realtime: triage_items
   useEffect(() => {
@@ -94,16 +148,20 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     return allItems.filter((i) => new Date(i.created_at) >= cutoff);
   }, [allItems, dateScope]);
 
-  // Action handlers — single canonical writer set
+  // Action handlers — single canonical writer set, all toast on result
   const handleApprove = useCallback(async (id: string) => {
     const r = await fetch('/api/actions/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (!r.ok) throw new Error('Failed to approve');
+    if (!r.ok) {
+      toast.push('error', 'Failed to approve');
+      throw new Error('Failed to approve');
+    }
     setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'approved' as const } : i)));
-  }, []);
+    toast.push('success', 'Approved · SLA clock started');
+  }, [toast]);
 
   const handleReject = useCallback(async (id: string) => {
     const r = await fetch('/api/actions/reject', {
@@ -111,19 +169,26 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (!r.ok) throw new Error('Failed to reject');
+    if (!r.ok) {
+      toast.push('error', 'Failed to reject');
+      throw new Error('Failed to reject');
+    }
     setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'rejected' as const } : i)));
-  }, []);
+    toast.push('info', 'Skipped');
+  }, [toast]);
 
   const handleMarkFollowedUp = useCallback(async (id: string) => {
-    // Resets the SLA clock by clearing follow_up_at and stamping last_follow_up_at
     const nowIso = new Date().toISOString();
     const { error } = await supabase
       .from('triage_items')
       .update({ follow_up_at: null, last_follow_up_at: nowIso, action_status: 'executed' })
       .eq('id', id);
-    if (error) throw new Error(error.message);
-  }, []);
+    if (error) {
+      toast.push('error', `Failed to mark: ${error.message}`);
+      throw new Error(error.message);
+    }
+    toast.push('success', 'Marked followed up');
+  }, [toast]);
 
   const handleApplicationStatusChange = useCallback(async (id: string, status: ApplicationStatus) => {
     setApplications((prev) =>
@@ -160,6 +225,31 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     { id: 'week', label: '7d' },
     { id: 'all', label: 'All' },
   ];
+
+  // Build palette commands
+  const paletteCommands: PaletteCommand[] = useMemo(() => {
+    const cmds: PaletteCommand[] = [
+      { id: 'go-now',      group: 'Navigate', label: 'Go to Now',      hint: 'g n', icon: PaletteIcons.Now,      run: () => setActiveSurface('now') },
+      { id: 'go-pipeline', group: 'Navigate', label: 'Go to Pipeline', hint: 'g p', icon: PaletteIcons.Pipeline, run: () => setActiveSurface('pipeline') },
+      { id: 'go-intake',   group: 'Navigate', label: 'Go to Intake',   hint: 'g i', icon: PaletteIcons.Intake,   run: () => setActiveSurface('intake') },
+      { id: 'go-health',   group: 'Navigate', label: 'Go to Health',   hint: 'g h', icon: PaletteIcons.Health,   run: () => setActiveSurface('health') },
+      { id: 'log-outbound', group: 'Action', label: 'Log a prospect touch', icon: PaletteIcons.Outbound,
+        run: () => { setActiveSurface('now'); toast.push('info', 'Use the Outbound counter on Now to log it.'); }
+      },
+      { id: 'add-engagement', group: 'Action', label: 'Add a new customer engagement', icon: PaletteIcons.Add,
+        run: () => { setActiveSurface('pipeline'); toast.push('info', 'Click "Add" in the Customers tab.'); }
+      },
+      { id: 'open-linkedin-dms', group: 'Action', label: 'Open LinkedIn DMs',
+        run: () => { window.open('https://www.linkedin.com/messaging/', '_blank'); } },
+      { id: 'open-gmail', group: 'Action', label: 'Open Gmail',
+        run: () => { window.open('https://mail.google.com', '_blank'); } },
+      { id: 'open-cal', group: 'Action', label: 'Open Calendar',
+        run: () => { window.open('https://calendar.google.com', '_blank'); } },
+      { id: 'open-booking', group: 'Action', label: 'Open booking link',
+        run: () => { window.open('https://cal.read.ai/philippe-datakult/30-min', '_blank'); } },
+    ];
+    return cmds;
+  }, [toast]);
 
   const renderSurface = () => {
     switch (activeSurface) {
@@ -202,6 +292,15 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
 
             <div className="flex items-center gap-2">
               <RunwayWidget />
+
+              <button
+                onClick={() => setPaletteOpen(true)}
+                title="Command palette (Cmd/Ctrl+K)"
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-mono text-tertiary bg-elevated/40 border border-border rounded-md hover:text-accent hover:border-accent/50 transition-colors"
+              >
+                <Command size={11} />
+                <span>K</span>
+              </button>
 
               <div className="hidden md:flex items-center gap-0.5 bg-elevated/40 border border-border rounded-md p-0.5">
                 {scopeOptions.map((opt) => (
@@ -307,6 +406,12 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
           </div>
         </div>
       </footer>
+
+      <CommandPalette
+        commands={paletteCommands}
+        isOpen={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+      />
 
       <ChatWidget items={items} applications={applications} stats={stats} />
     </div>

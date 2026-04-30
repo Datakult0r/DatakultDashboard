@@ -61,6 +61,7 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
   const value = engagement.value_eur ?? 0;
   const prob = engagement.probability ?? 0;
   const weighted = Math.round((value * prob) / 100);
+  const showFinancials = editing || value > 0;
 
   return (
     <div className="bg-surface border border-border rounded-lg p-4 hover:border-border-strong transition-colors">
@@ -123,37 +124,39 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
         </div>
       )}
 
-      {/* Value + probability */}
-      <div className="flex items-center gap-3 text-[11px] font-mono mb-3">
-        {editing ? (
-          <>
-            <input
-              type="number"
-              value={draft.value_eur ?? 0}
-              onChange={(e) => setDraft({ ...draft, value_eur: Number(e.target.value) || null })}
-              placeholder="EUR"
-              className="w-20 bg-elevated border border-border rounded px-2 py-0.5 text-money"
-            />
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={draft.probability ?? 0}
-              onChange={(e) => setDraft({ ...draft, probability: Number(e.target.value) || 0 })}
-              className="w-14 bg-elevated border border-border rounded px-2 py-0.5 text-secondary"
-            />
-            <span className="text-tertiary">%</span>
-          </>
-        ) : (
-          <>
-            <span className="text-money">€{value.toLocaleString()}</span>
-            <span className="text-tertiary">·</span>
-            <span className="text-secondary">{prob}%</span>
-            <span className="text-tertiary">·</span>
-            <span className="text-money/70">€{weighted.toLocaleString()} weighted</span>
-          </>
-        )}
-      </div>
+      {/* Value + probability — only render if editing or value>0 (avoid €0 noise) */}
+      {showFinancials && (
+        <div className="flex items-center gap-3 text-[11px] font-mono mb-3">
+          {editing ? (
+            <>
+              <input
+                type="number"
+                value={draft.value_eur ?? ''}
+                onChange={(e) => setDraft({ ...draft, value_eur: Number(e.target.value) || null })}
+                placeholder="EUR"
+                className="w-20 bg-elevated border border-border rounded px-2 py-0.5 text-money"
+              />
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={draft.probability ?? 0}
+                onChange={(e) => setDraft({ ...draft, probability: Number(e.target.value) || 0 })}
+                className="w-14 bg-elevated border border-border rounded px-2 py-0.5 text-secondary"
+              />
+              <span className="text-tertiary">%</span>
+            </>
+          ) : (
+            <>
+              <span className="text-money">€{value.toLocaleString()}</span>
+              <span className="text-tertiary">·</span>
+              <span className="text-secondary">{prob}%</span>
+              <span className="text-tertiary">·</span>
+              <span className="text-money/70">€{weighted.toLocaleString()} weighted</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Next step */}
       {editing ? (

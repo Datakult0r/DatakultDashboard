@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { ToastProvider } from '@/components/Toast';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -41,7 +42,7 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrains.variable} h-full`}
     >
       <body className="min-h-full bg-base text-primary">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

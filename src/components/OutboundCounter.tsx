@@ -1,29 +1,33 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Send, Plus, Check } from 'lucide-react';
+import { Send, Plus, Check, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
-import type { OutboundDailyRow } from '@/types/triage';
+import type { OutboundLog } from '@/types/triage';
 
 const DAILY_QUOTA = 5;
 
-/** Daily outbound prospecting counter. Click + to log a touch. */
+/** Daily outbound prospecting counter. Click + to log a touch; expand to see today's contacts. */
 export default function OutboundCounter() {
-  const [today, setToday] = useState(0);
+  const [todayLogs, setTodayLogs] = useState<OutboundLog[]>([]);
   const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('linkedin');
   const [context, setContext] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const today = todayLogs.length;
+
   const reload = async () => {
     const todayStr = new Date().toISOString().split('T')[0];
     const { data } = await supabase
-      .from('outbound_daily')
+      .from('outbound_log')
       .select('*')
       .eq('log_date', todayStr)
-      .maybeSingle();
-    setToday((data as OutboundDailyRow | null)?.count ?? 0);
+      .order('created_at', { ascending: false });
+    setTodayLogs((data ?? []) as OutboundLog[]);
   };
 
   useEffect(() => {
@@ -134,6 +138,42 @@ export default function OutboundCounter() {
           <Plus size={12} />
           Log a prospect touch
         </button>
+      )}
+
+      {/* Today's log — expandable so the user can see who's already been touched */}
+      {todayLogs.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border/40">
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="w-full flex items-center justify-between text-[10px] uppercase tracking-wider font-mono text-tertiary hover:text-secondary"
+          >
+            <span>Today · {todayLogs.length} contact{todayLogs.length === 1 ? '' : 's'}</span>
+            {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+          {expanded && (
+            <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+              {todayLogs.map((l) => (
+                <li key={l.id} className="text-[11px] flex items-baseline justify-between gap-2 hover:bg-elevated/30 px-1 py-0.5 rounded">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {l.contact_url ? (
+                      <a href={l.contact_url} target="_blank" rel="noopener noreferrer"
+                        className="text-accent hover:text-accent-bright truncate inline-flex items-center gap-1">
+                        {l.contact_name || 'Unnamed'}
+                        <ExternalLink size={9} />
+                      </a>
+                    ) : (
+                      <span className="text-secondary truncate">{l.contact_name || 'Unnamed'}</span>
+                    )}
+                    {l.context && <span className="text-tertiary truncate">— {l.context}</span>}
+                  </div>
+                  <span className="text-tertiary font-mono whitespace-nowrap">
+                    {l.channel} · {format(new Date(l.created_at), 'HH:mm')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
