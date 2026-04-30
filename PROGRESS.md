@@ -1,84 +1,74 @@
-# Triage Dashboard - Development Progress
+# Control Tower — Progress Log
 
-## Completed Tasks
+## Deployment: LIVE
+- **URL**: https://datakult-dashboard.vercel.app
+- **Vercel**: Production on `master` branch, CoAI team
 
-### Phase 1: Component Architecture (Complete)
-- [x] SourceTag component - colored badges for source types
-- [x] StatCard component - large stat display
-- [x] TriageCard component - urgent/review items with expandable drafts
-- [x] ScoreChip component - reusable score badges
-- [x] PipelineFunnel component - pipeline visualization
-- [x] ApplicationTracker component - application tracking
-- [x] ApplicationRow component - individual application row
-- [x] ApprovalQueue component - agentic approval queue
-- [x] ActionCard component - action payload display
-- [x] JobCard component - job pipeline card
-- [x] NewsCard component - news items with thumbnails
-- [x] ScheduleRow component - calendar items
-- [x] DashboardShell component - main shell with tabs
+## 2026-04-30 — Control Tower v2.1 (data-drift fix + Health tab + Today filter)
 
-### Phase 2: Type System (Complete)
-- [x] TriageCategory type definitions
-- [x] ScoreLabel type definitions
-- [x] ActionType and ActionStatus enums
-- [x] TriageItem interface with A2UI fields
-- [x] JobApplication interface
-- [x] TriageStats interface
-- [x] ActionPayload interface
+### Why this matters
+Audit revealed three silent failures that made the dashboard look healthier than it was:
+1. **Approval Queue was always empty** — DB stored `action_status = 'pending'` (legacy writers) but UI filtered for `'pending_review'`. Items existed but never rendered. 5 items recovered after migration.
+2. **Cron has been failing for 2+ days** — `gmail` step throws `invalid_grant: Bad Request` on every run; `apify`, `firecrawl`, `perplexity` all `skipped` because env vars not set in production. No surface in the UI to spot this.
+3. **Every page load logged a Next.js 16 metadata warning** — `viewport` was nested in `metadata` instead of being its own export.
 
-### Phase 3: App Structure (Complete)
-- [x] Server component page.tsx with Supabase fetching
-- [x] Root layout.tsx with font configuration
-- [x] Global styles with animations and dark theme
-- [x] Supabase client initialization
+### Shipped
+- **DB migration (Supabase)** — Normalized `action_status` (`pending`→`pending_review`, `completed`→`executed`, `none`→NULL) and `action_type` (`reply`→`send_message`, `monitor/none`→NULL). Added CHECK constraints so future writers can't drift again.
+- **`triage_stats` view rebuilt** — now exposes `pending_actions_count`, `approved_actions_count`, `executed_actions_count`. The "To Approve" stat card now reads from the view instead of guessing client-side.
+- **`system_health_summary` view (new)** — latest row per source/operation in the last 7 days, ranked.
+- **`SystemHealthPanel` component (new)** + **Health tab** in dashboard — green/red/grey tiles per integration, last-run age, error preview, OK/Error/Skipped/Fallback/Timeout breakdown. First-class operational visibility.
+- **`/api/health/env` route (new)** — reports which env vars are present (no values) so we can diagnose missing keys from the dashboard or curl.
+- **Date scope filter** in header — `Today / 24h / 7d / All` pills. All tabs honour it. Stops 14-day mix from drowning today's signal.
+- **Defensive filters** — ApprovalQueue + DashboardShell now treat both `pending_review` (canonical) and `pending` (legacy) as pending during the rollout window.
+- **layout.tsx** — `viewport` exported separately. Killed the `Unsupported metadata view` warning on every render.
+- **Title rebrand** — "Control Tower | Clinic of AI" instead of "Morning Triage".
 
-### Phase 4: API Routes (Complete)
-- [x] POST /api/actions/approve - approve actions
-- [x] POST /api/actions/reject - reject actions
-- [x] POST /api/applications/status - update app status
+### Outstanding (require user action)
+- **Gmail OAuth refresh token revoked** — needs a fresh token via `get-refresh-token.py` (or equivalent OAuth dance), then `vercel env rm GMAIL_REFRESH_TOKEN production && vercel env add GMAIL_REFRESH_TOKEN production`.
+- **Production env vars missing**: `APIFY_API_TOKEN`, `FIRECRAWL_API_KEY`, `PERPLEXITY_API_KEY` — verify they're set in Vercel project settings (memory said they were; system_health says they're not).
+- The two `dirty=1` deployments in the rollback list (016f852, 763810e) suggest some manual `vercel deploy --prod` runs that bypassed git. Worth pruning to keep the trail clean.
 
-### Phase 5: Configuration (Complete)
-- [x] tailwind.config.ts with dark theme tokens
-- [x] tsconfig.json with strict mode
-- [x] next.config.ts with image optimization
-- [x] eslint.config.mjs
-- [x] postcss.config.mjs
-- [x] .gitignore
-- [x] package.json with dependencies
-- [x] package-lock.json
+### Original Deployment Reference
+- Pre-fix commit: c7896db (Control Tower v2 - all 4 phases complete)
 
-### Phase 6: Documentation (Complete)
-- [x] CLAUDE.md - development guide
-- [x] @AGENTS.md - Next.js 16 breaking changes
-- [x] PROGRESS.md - this file
+## Phase 1: Backend Integrations
+- [x] Perplexity news (sonar-pro, 3 queries, dedup) — `src/lib/perplexity.ts`
+- [x] Google Calendar API (reuses Gmail OAuth) — `src/lib/calendar.ts`
+- [x] Apify actors verified (curious_coder, misceres) — `src/lib/apify.ts`
 
-## Build Status
-- TypeScript: strict mode enabled
-- Tailwind CSS 4: dark theme with custom tokens
-- Components: All 13 components built and exported
-- Animations: fadeSlideUp, fadeIn, shimmer, pulseGlow implemented
-- Copy-to-clipboard: Working in TriageCard
-- Supabase: Realtime subscription setup in DashboardShell
+## Phase 2: Data Pipeline Enrichment
+- [x] News images + hover abstracts — `src/components/NewsCard.tsx`
+- [x] Personal email (2nd Gmail account) — `src/lib/gmail.ts`
+- [x] 21-day retention, pending items kept forever — `collect/route.ts`
+- [x] CV Tailoring engine (Claude API) — `src/lib/cv-tailor.ts`
 
-## Known Implementation Details
-- Colors use CSS variables (hsl var syntax)
-- Images use next/image with width/height/alt
-- Client-side components use 'use client' directive
-- Server components can fetch from Supabase directly
-- A2UI pattern implemented in approval queue system
-- Score chips have pulsing animation for priority items
+## Phase 3: Job Application Automation
+- [x] Easy Apply via Browser Use Cloud v3 — `src/lib/browser-use.ts`
+- [x] 0-credit alert banner — `src/components/SystemAlert.tsx`
+- [x] Website apply workflow + pipeline tracking — `api/actions/apply-website/`
 
-## Next Steps
-1. Create .env.local with Supabase credentials
-2. Run `npm install` to install dependencies
-3. Run `npm run dev` to start development server
-4. Test Supabase connection and realtime updates
-5. Test component rendering and interactions
-6. Run `npm run build` for production build
+## Phase 4: AG-UI/A2UI Polish
+- [x] CSS 3D card flip on JobCard (score breakdown, cover letter, CV notes)
+- [x] Hover-to-expand abstracts on NewsCard
+- [x] Chat widget (Claude-powered bottom panel) — `src/components/ChatWidget.tsx`
+- [x] Error boundary — `src/components/ErrorBoundary.tsx`
+- [x] Loading skeletons — `src/components/LoadingSkeleton.tsx`
+- [x] Slide-up animation for chat panel
 
-## Notes
-- All file paths use absolute imports with @/* alias
-- Date formatting uses date-fns library
-- Lucide React icons available throughout
-- Responsive design uses Tailwind breakpoints
-- Dark mode is the default and only theme
+## New Files Created
+- `src/lib/perplexity.ts` — Perplexity API for AI news
+- `src/lib/calendar.ts` — Google Calendar integration
+- `src/lib/cv-tailor.ts` — Claude-powered CV tailoring
+- `src/lib/browser-use.ts` — Browser Use Cloud Easy Apply
+- `src/components/ChatWidget.tsx` — NL dashboard assistant
+- `src/components/ErrorBoundary.tsx` — React error boundary
+- `src/components/LoadingSkeleton.tsx` — Shimmer loading states
+- `src/components/SystemAlert.tsx` — Dashboard-wide alert banner
+- `src/app/api/chat/route.ts` — Chat API endpoint
+- `src/app/api/actions/apply/route.ts` — Easy Apply execution
+- `src/app/api/actions/apply-website/route.ts` — Website apply workflow
+
+## TypeScript Fixes
+- Added `gmail_personal` to SourceType union
+- Added `gmail_personal` entry in SourceTag colorMap
+- Added `gmail_personal` entry in TriageCard sourceIcon map

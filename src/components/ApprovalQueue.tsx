@@ -24,9 +24,16 @@ type QueueFilter = 'pending' | 'approved' | 'rejected' | 'all';
 export default function ApprovalQueue({ items, onApprove, onReject }: ApprovalQueueProps) {
   const [filter, setFilter] = useState<QueueFilter>('pending');
 
-  const pendingItems = items.filter((i) => i.action_status === 'pending_review');
-  const approvedItems = items.filter((i) => i.action_status === 'approved' || i.action_status === 'executing' || i.action_status === 'executed');
-  const rejectedItems = items.filter((i) => i.action_status === 'rejected');
+  // Defensively treat both canonical 'pending_review' AND legacy 'pending' as pending,
+  // since older Cowork session writers used 'pending'. CHECK constraint blocks new bad writes,
+  // but old data may still flow through realtime updates during the rollout window.
+  const pendingItems = items.filter(
+    (i) => i.action_status === 'pending_review' || (i.action_status as string) === 'pending'
+  );
+  const approvedItems = items.filter(
+    (i) => i.action_status === 'approved' || i.action_status === 'executing' || i.action_status === 'executed'
+  );
+  const rejectedItems = items.filter((i) => i.action_status === 'rejected' || i.action_status === 'failed');
 
   const filteredItems = filter === 'pending'
     ? pendingItems
@@ -36,10 +43,15 @@ export default function ApprovalQueue({ items, onApprove, onReject }: ApprovalQu
         ? rejectedItems
         : items;
 
-  // Sort: pending_review first (by score descending), then by created_at
+  // Sort: pending first (by priority desc, then score), then everything else by score
+  const isPending = (s: string | null | undefined) => s === 'pending_review' || s === 'pending';
   const sortedItems = [...filteredItems].sort((a, b) => {
-    if (a.action_status === 'pending_review' && b.action_status !== 'pending_review') return -1;
-    if (a.action_status !== 'pending_review' && b.action_status === 'pending_review') return 1;
+    const aPending = isPending(a.action_status);
+    const bPending = isPending(b.action_status);
+    if (aPending && !bPending) return -1;
+    if (!aPending && bPending) return 1;
+    const priorityDiff = (b.priority || 0) - (a.priority || 0);
+    if (priorityDiff !== 0) return priorityDiff;
     return (b.score || 0) - (a.score || 0);
   });
 

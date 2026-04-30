@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -15,9 +15,19 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Morning Triage | Clinic of AI',
-  description: 'Daily triage dashboard for managing priorities, job pipeline, and communications.',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  title: 'Control Tower | Clinic of AI',
+  description: 'Live triage, pipeline, and intelligence dashboard. Approve agent-prepared actions in one click.',
+};
+
+/**
+ * Next.js 16: viewport must be its own export, not nested in metadata.
+ * This silences the "Unsupported metadata view" warning logged on every page load.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#0a0a0a',
 };
 
 export default function RootLayout({

@@ -104,7 +104,27 @@ export interface TriageStat {
   job_count: number;
   done_count: number;
   in_progress_count: number;
+  /** Items the agent prepared and the human still needs to approve. */
+  pending_actions_count: number;
+  /** Items the human approved that are awaiting execution. */
+  approved_actions_count: number;
+  /** Items the agent has already executed. */
+  executed_actions_count: number;
   total_count: number;
+}
+
+/** Snapshot row from the system_health_summary view — one row per integration step per cron run. */
+export interface SystemHealthRow {
+  cron_run_id: string;
+  source: string;
+  operation: string;
+  status: 'ok' | 'error' | 'fallback' | 'skipped' | 'timeout';
+  items_count: number;
+  duration_ms: number;
+  error_message: string | null;
+  fallback_used: string | null;
+  created_at: string;
+  recency_rank: number;
 }
 
 export interface TriageItemsByCategory {

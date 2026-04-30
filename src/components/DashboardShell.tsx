@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import {
   Shield,
@@ -16,6 +16,7 @@ import {
   Globe,
   CalendarDays,
   Link2,
+  HeartPulse,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { TriageItem, TriageStat, JobApplication, ApplicationStatus } from '@/types/triage';
@@ -29,11 +30,24 @@ import ApplicationTracker from './ApplicationTracker';
 import MissedMeetingCard from './MissedMeetingCard';
 import MissionCriticalBar from './MissionCriticalBar';
 import SystemAlert from './SystemAlert';
+import SystemHealthPanel from './SystemHealthPanel';
 import ChatWidget from './ChatWidget';
 import ErrorBoundary from './ErrorBoundary';
 import type { MissionItem } from './MissionCriticalBar';
 
-type TabType = 'missed' | 'approval' | 'action' | 'review' | 'jobs' | 'applications' | 'news' | 'schedule' | 'done';
+type TabType =
+  | 'missed'
+  | 'approval'
+  | 'action'
+  | 'review'
+  | 'jobs'
+  | 'applications'
+  | 'news'
+  | 'schedule'
+  | 'done'
+  | 'health';
+
+type DateScope = 'today' | '24h' | 'week' | 'all';
 
 interface DashboardShellProps {
   /** Initial triage items from server */
@@ -53,16 +67,50 @@ export default function DashboardShell({
   initialStats,
   initialApplications,
 }: DashboardShellProps) {
-  const [items, setItems] = useState<TriageItem[]>(initialItems);
+  const [allItems, setAllItems] = useState<TriageItem[]>(initialItems);
   const [stats, setStats] = useState<TriageStat | null>(initialStats);
   const [applications, setApplications] = useState<JobApplication[]>(initialApplications);
+  const [dateScope, setDateScope] = useState<DateScope>('week');
   // Default to missed tab if there are pending missed items, otherwise approval
   const [activeTab, setActiveTab] = useState<TabType>(
-    initialItems.some((i) => i.tags?.includes('missed') && i.action_status === 'pending_review')
+    initialItems.some(
+      (i) =>
+        i.tags?.includes('missed') &&
+        (i.action_status === 'pending_review' || (i.action_status as string) === 'pending')
+    )
       ? 'missed'
       : 'approval'
   );
   const [now, setNow] = useState(new Date());
+
+  // Date-scoped slice of items (everything except Health tab uses this)
+  const items = useMemo(() => {
+    if (dateScope === 'all') return allItems;
+    const cutoff = (() => {
+      const d = new Date();
+      if (dateScope === 'today') {
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      if (dateScope === '24h') {
+        d.setHours(d.getHours() - 24);
+        return d;
+      }
+      // week
+      d.setDate(d.getDate() - 7);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    })();
+    return allItems.filter((i) => new Date(i.created_at) >= cutoff);
+  }, [allItems, dateScope]);
+
+  // Wrappers that mutate the canonical state
+  const setItems = useCallback(
+    (updater: TriageItem[] | ((prev: TriageItem[]) => TriageItem[])) => {
+      setAllItems(typeof updater === 'function' ? (updater as (prev: TriageItem[]) => TriageItem[]) : () => updater);
+    },
+    []
+  );
 
   // Update current time for schedule highlighting
   useEffect(() => {
@@ -200,10 +248,13 @@ export default function DashboardShell({
     return items.filter((item) => item.category === category && item.status !== 'skipped');
   };
 
+  // Defensive: treat both 'pending_review' (canonical) and 'pending' (legacy) as pending.
+  const isPendingReview = (s: string | null | undefined) =>
+    s === 'pending_review' || s === 'pending';
   const missedItems = items.filter((i) => i.tags?.includes('missed'));
-  const missedPending = missedItems.filter((i) => i.action_status === 'pending_review');
+  const missedPending = missedItems.filter((i) => isPendingReview(i.action_status));
   const actionableItems = items.filter((i) => i.action_type !== null && !i.tags?.includes('missed'));
-  const pendingActions = actionableItems.filter((i) => i.action_status === 'pending_review');
+  const pendingActions = actionableItems.filter((i) => isPendingReview(i.action_status));
   const urgentItems = getItemsByCategory('urgent').filter((i) => !i.tags?.includes('missed'));
   const reviewItems = getItemsByCategory('review');
   const jobItems = getItemsByCategory('job');
@@ -279,6 +330,7 @@ export default function DashboardShell({
     { id: 'news', label: 'News', icon: <Newspaper size={16} />, count: newsItems.length },
     { id: 'schedule', label: 'Schedule', icon: <Clock size={16} />, count: scheduleItems.length },
     { id: 'done', label: 'Done', icon: <CheckCircle2 size={16} />, count: doneItems.length },
+    { id: 'health', label: 'Health', icon: <HeartPulse size={16} />, count: 0 },
   ];
 
   // Render tab content
@@ -431,10 +483,21 @@ export default function DashboardShell({
           </div>
         );
 
+      case 'health':
+        return <SystemHealthPanel />;
+
       default:
         return null;
     }
   };
+
+  // Date scope filter pills
+  const scopeOptions: { id: DateScope; label: string }[] = [
+    { id: 'today', label: 'Today' },
+    { id: '24h', label: '24h' },
+    { id: 'week', label: '7d' },
+    { id: 'all', label: 'All' },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col relative z-10">
@@ -485,6 +548,24 @@ export default function DashboardShell({
                   Book
                 </a>
               </div>
+              {/* Date scope filter — controls what date range the tabs show */}
+              <div className="hidden md:flex items-center gap-0.5 ml-3 bg-elevated/40 border border-border/40 rounded-md p-0.5">
+                {scopeOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setDateScope(opt.id)}
+                    aria-pressed={dateScope === opt.id}
+                    className={`px-2 py-1 text-[11px] font-mono uppercase tracking-wider rounded transition-colors ${
+                      dateScope === opt.id
+                        ? 'bg-accent/20 text-accent'
+                        : 'text-secondary hover:text-primary hover:bg-elevated/60'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="text-right ml-3">
                 <p className="text-xs text-secondary font-mono">
                   {format(new Date(), 'EEEE')}
@@ -512,7 +593,7 @@ export default function DashboardShell({
               />
             )}
             <StatCard
-              number={pendingActions.length}
+              number={stats?.pending_actions_count ?? pendingActions.length}
               label="To Approve"
               bgColor="bg-warning/8"
               numberColor="text-warning"
@@ -624,7 +705,7 @@ export default function DashboardShell({
       <footer className="glass border-t border-border/40 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-xs text-secondary/60">
           <span className="text-[10px] tracking-[0.15em] uppercase font-mono">
-            AG-UI · Chatless Surface
+            AG-UI · Chatless Surface · Scope: {dateScope.toUpperCase()}
           </span>
           <div className="flex items-center gap-3">
             <span className="font-mono">
@@ -632,7 +713,7 @@ export default function DashboardShell({
             </span>
             <span className="text-secondary/30">|</span>
             <span className="font-mono text-[10px]">
-              {items.length} items · {applications.length} apps
+              {items.length}/{allItems.length} items · {applications.length} apps
             </span>
           </div>
         </div>
