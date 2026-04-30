@@ -104,12 +104,28 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
 
       {/* Contact */}
       {editing ? (
-        <input
-          value={draft.contact_name ?? ''}
-          onChange={(e) => setDraft({ ...draft, contact_name: e.target.value || null })}
-          placeholder="Contact name"
-          className="w-full bg-elevated border border-border rounded px-2 py-1 text-xs text-secondary mb-2"
-        />
+        <div className="space-y-1.5 mb-2">
+          <input
+            value={draft.contact_name ?? ''}
+            onChange={(e) => setDraft({ ...draft, contact_name: e.target.value || null })}
+            placeholder="Contact name"
+            className="w-full bg-elevated border border-border rounded px-2 py-1 text-xs text-secondary"
+          />
+          <input
+            type="email"
+            value={draft.contact_email ?? ''}
+            onChange={(e) => setDraft({ ...draft, contact_email: e.target.value || null })}
+            placeholder="Email"
+            className="w-full bg-elevated border border-border rounded px-2 py-1 text-xs text-secondary"
+          />
+          <input
+            type="url"
+            value={draft.contact_url ?? ''}
+            onChange={(e) => setDraft({ ...draft, contact_url: e.target.value || null })}
+            placeholder="URL (LinkedIn, etc.)"
+            className="w-full bg-elevated border border-border rounded px-2 py-1 text-xs text-secondary"
+          />
+        </div>
       ) : engagement.contact_name && (
         <div className="text-xs text-secondary mb-2 flex items-center gap-2">
           {engagement.contact_url ? (
@@ -121,6 +137,11 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
             <span>{engagement.contact_name}</span>
           )}
           {engagement.contact_url && <ExternalLink size={10} className="text-tertiary" />}
+          {engagement.contact_email && (
+            <a href={`mailto:${engagement.contact_email}`} className="text-tertiary hover:text-accent">
+              · {engagement.contact_email}
+            </a>
+          )}
         </div>
       )}
 

@@ -17,6 +17,7 @@ import ChatWidget from './ChatWidget';
 import ErrorBoundary from './ErrorBoundary';
 import SystemAlert from './SystemAlert';
 import CommandPalette, { PaletteIcons, type PaletteCommand } from './CommandPalette';
+import ShortcutHelpModal from './ShortcutHelpModal';
 import { useToast } from './Toast';
 import type { CustomerEngagement } from '@/types/triage';
 
@@ -44,6 +45,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   const [activeSurface, setActiveSurface] = useState<Surface>('now');
   const [now, setNow] = useState(new Date());
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const toast = useToast();
 
   // Load engagements once for palette search
@@ -133,7 +135,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
 
       if (e.key === '?') {
         e.preventDefault();
-        toast.push('info', 'Shortcuts: g+n/p/i/h tab nav · k command palette · o log outbound');
+        setHelpOpen(true);
         return;
       }
 
@@ -501,11 +503,14 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         onClose={() => setPaletteOpen(false)}
       />
 
-      {/* Mobile FAB to open the palette — Cmd+K isn't available on touch */}
+      <ShortcutHelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Mobile FAB to open the palette — Cmd+K isn't available on touch.
+          Positioned above the ChatWidget to avoid collision. */}
       <button
         onClick={() => setPaletteOpen(true)}
         aria-label="Command palette"
-        className="md:hidden fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full bg-accent text-base shadow-lg flex items-center justify-center hover:bg-accent-bright active:scale-95 transition-all"
+        className="md:hidden fixed bottom-24 right-4 z-50 w-12 h-12 rounded-full bg-accent text-base shadow-lg flex items-center justify-center hover:bg-accent-bright active:scale-95 transition-all"
       >
         <Command size={18} />
       </button>

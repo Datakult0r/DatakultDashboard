@@ -8,6 +8,7 @@ import type { NextAction } from '@/types/triage';
 import SLABadge from './SLABadge';
 import WeeklyWinsBar from './WeeklyWinsBar';
 import OutboundCounter from './OutboundCounter';
+import MorningBriefing from './MorningBriefing';
 import { useToast } from './Toast';
 
 interface NowSurfaceProps {
@@ -121,6 +122,9 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
           {dueCount > 0 && <span className="text-money">{dueCount} engagement{dueCount === 1 ? '' : 's'} due</span>}
         </div>
       )}
+
+      {/* Chief of staff morning briefing — one-paragraph context */}
+      <MorningBriefing />
 
       {/* Wins + outbound row — visible above the fold even when there are no actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
