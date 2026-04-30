@@ -52,8 +52,38 @@ export default function MorningBriefing() {
     );
   }
 
-  if (!data || data.error) return null;
-  if (!data.briefing) return null;
+  // Surface error states explicitly — silent failure was making AI outages invisible
+  if (data?.error) {
+    const isCredits = data.error.toLowerCase().includes('credit balance');
+    return (
+      <div className={`rounded-lg p-3 border ${isCredits ? 'bg-danger/10 border-danger/30' : 'bg-warning/10 border-warning/30'}`}>
+        <div className="flex items-start gap-2">
+          <Sparkles size={14} className={`mt-0.5 ${isCredits ? 'text-danger' : 'text-warning'}`} />
+          <div className="flex-1">
+            <p className={`text-xs font-semibold ${isCredits ? 'text-danger' : 'text-warning'}`}>
+              {isCredits ? 'Anthropic API credits exhausted' : 'Briefing unavailable'}
+            </p>
+            <p className="text-[11px] text-secondary mt-0.5">
+              {isCredits
+                ? 'Add credits at console.anthropic.com — until then, briefing, triage scoring and CV tailoring will all fail.'
+                : 'Briefing failed to generate. Check the Health tab for details.'}
+            </p>
+            {isCredits && (
+              <a
+                href="https://console.anthropic.com/settings/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-1.5 text-[11px] text-danger underline underline-offset-2 hover:no-underline"
+              >
+                Open billing →
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (!data || !data.briefing) return null;
 
   return (
     <div className="bg-surface border border-border rounded-lg p-4">
