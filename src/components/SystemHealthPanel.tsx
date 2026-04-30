@@ -47,6 +47,26 @@ export default function SystemHealthPanel() {
     }
   };
 
+  const runCron = async () => {
+    if (!confirm('Trigger a fresh triage run now? This will fetch Gmail, score, and write to the dashboard.')) return;
+    setRunning(true);
+    toast.push('info', 'Cron triggered — this can take up to 5 minutes…');
+    try {
+      const r = await fetch('/api/triage/run', { method: 'POST' });
+      const data = await r.json();
+      if (r.ok && data.ok) {
+        toast.push('success', `Cron complete — ${data.result?.gmail?.fetched ?? 0} emails fetched`);
+        setRefreshKey((k) => k + 1);
+      } else {
+        toast.push('error', data.result?.errors?.[0] || data.error || 'Cron failed');
+      }
+    } catch (err) {
+      toast.push('error', err instanceof Error ? err.message : 'Cron call failed');
+    } finally {
+      setRunning(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -122,12 +142,21 @@ export default function SystemHealthPanel() {
           </div>
           <div className="flex items-center gap-1.5">
             <button
+              onClick={runCron}
+              disabled={running}
+              className="text-xs px-2 py-1 rounded bg-accent/10 text-accent hover:bg-accent/20 border border-accent/30 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+              title="Trigger /api/triage/collect now (Gmail + Apify + Firecrawl + Claude)"
+            >
+              <Play size={12} className={running ? 'animate-spin' : ''} />
+              Run cron now
+            </button>
+            <button
               onClick={runApproved}
               disabled={running}
               className="text-xs px-2 py-1 rounded bg-money/10 text-money hover:bg-money/20 border border-money/30 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
               title="Mark all approved items as executed and clear their SLA timers"
             >
-              <Play size={12} />
+              <CheckCircle2 size={12} />
               Run approved
             </button>
             <button

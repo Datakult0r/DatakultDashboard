@@ -1,10 +1,10 @@
 import type { NextConfig } from 'next';
-import path from 'path';
 
 const nextConfig: NextConfig = {
-  // Turbopack root — silences "multiple lockfiles detected" warning on every build
+  // Turbopack root pinned to this directory — silences "multiple lockfiles" warning.
+  // Use process.cwd() for ESM-safety (no __dirname).
   turbopack: {
-    root: path.resolve(__dirname),
+    root: process.cwd(),
   },
   images: {
     remotePatterns: [

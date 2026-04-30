@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
-  Shield, AlertCircle, Activity, Briefcase, Newspaper, Clock, CheckCircle2, PhoneOff,
+  Shield, AlertCircle, Activity, Briefcase, Newspaper, Clock, CheckCircle2, PhoneOff, Search, X,
 } from 'lucide-react';
 import type { TriageItem } from '@/types/triage';
 import TriageCard from './TriageCard';
@@ -22,21 +22,46 @@ type IntakeSubtab = 'missed' | 'approve' | 'action' | 'review' | 'jobs' | 'news'
 
 const isPending = (s: string | null | undefined) => s === 'pending_review' || s === 'pending';
 
+function matchesQuery(item: TriageItem, q: string): boolean {
+  if (!q) return true;
+  const haystack = [
+    item.title,
+    item.subtitle,
+    item.contact_name,
+    item.contact_email,
+    item.company,
+    item.role_title,
+    item.source,
+    ...(item.tags ?? []),
+  ].filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(q.toLowerCase());
+}
+
 /** INTAKE surface — wraps the old per-category tabs as collapsed sub-navigation. */
 export default function IntakeSurface({ items, onApprove, onReject }: IntakeSurfaceProps) {
-  const missed = items.filter((i) => i.tags?.includes('missed'));
-  const missedPending = missed.filter((i) => isPending(i.action_status));
-  const actionable = items.filter((i) => i.action_type !== null && !i.tags?.includes('missed'));
-  const pending = actionable.filter((i) => isPending(i.action_status));
-  const urgent = items.filter((i) => i.category === 'urgent' && !i.tags?.includes('missed') && i.status !== 'skipped');
-  const review = items.filter((i) => i.category === 'review' && i.status !== 'skipped');
-  const jobs = items.filter((i) => i.category === 'job' && i.status !== 'skipped');
-  const news = items.filter((i) => i.category === 'news' && i.status !== 'skipped');
-  const schedule = items.filter((i) => i.category === 'schedule' && i.status !== 'skipped');
-  const done = items.filter((i) => i.category === 'done' || i.status === 'completed');
-
-  const [sub, setSub] = useState<IntakeSubtab>(missed.length > 0 ? 'missed' : 'approve');
+  const [sub, setSub] = useState<IntakeSubtab>('approve');
   const [now] = useState(new Date());
+  const [query, setQuery] = useState('');
+
+  // Apply search query first
+  const filtered = useMemo(() => items.filter((i) => matchesQuery(i, query)), [items, query]);
+
+  const missed = filtered.filter((i) => i.tags?.includes('missed'));
+  const missedPending = missed.filter((i) => isPending(i.action_status));
+  const actionable = filtered.filter((i) => i.action_type !== null && !i.tags?.includes('missed'));
+  const pending = actionable.filter((i) => isPending(i.action_status));
+  const urgent = filtered.filter((i) => i.category === 'urgent' && !i.tags?.includes('missed') && i.status !== 'skipped');
+  const review = filtered.filter((i) => i.category === 'review' && i.status !== 'skipped');
+  const jobs = filtered.filter((i) => i.category === 'job' && i.status !== 'skipped');
+  const news = filtered.filter((i) => i.category === 'news' && i.status !== 'skipped');
+  const schedule = filtered.filter((i) => i.category === 'schedule' && i.status !== 'skipped');
+  const done = filtered.filter((i) => i.category === 'done' || i.status === 'completed');
+
+  // Default to missed tab if there are pending missed items the FIRST time
+  useMemo(() => {
+    if (missed.length > 0 && sub === 'approve') setSub('missed');
+    // intentionally only react to mount via missed length sentinel
+  }, [missed.length, sub]);
 
   const subs: { id: IntakeSubtab; label: string; icon: React.ReactNode; count: number; danger?: boolean; pulse?: boolean }[] = [
     ...(missed.length > 0 ? [{ id: 'missed' as IntakeSubtab, label: 'Missed', icon: <PhoneOff size={14} />, count: missedPending.length, danger: true, pulse: true }] : []),
@@ -119,6 +144,27 @@ export default function IntakeSurface({ items, onApprove, onReject }: IntakeSurf
 
   return (
     <div className="space-y-4">
+      {/* Search bar */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-md focus-within:border-accent transition-colors">
+        <Search size={14} className="text-tertiary flex-shrink-0" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search intake — name, company, source, tags…"
+          className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-tertiary"
+        />
+        {query && (
+          <button onClick={() => setQuery('')} className="text-tertiary hover:text-secondary" aria-label="Clear search">
+            <X size={12} />
+          </button>
+        )}
+        {query && (
+          <span className="text-[10px] font-mono text-tertiary">
+            {filtered.length} match
+          </span>
+        )}
+      </div>
+
       <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border/40 pb-2 -mx-1 px-1">
         {subs.map((t) => (
           <button

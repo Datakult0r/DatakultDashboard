@@ -18,6 +18,7 @@ import ErrorBoundary from './ErrorBoundary';
 import SystemAlert from './SystemAlert';
 import CommandPalette, { PaletteIcons, type PaletteCommand } from './CommandPalette';
 import { useToast } from './Toast';
+import type { CustomerEngagement } from '@/types/triage';
 
 type Surface = 'now' | 'pipeline' | 'intake' | 'health';
 type DateScope = 'today' | '24h' | 'week' | 'all';
@@ -38,11 +39,35 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   const [allItems, setAllItems] = useState<TriageItem[]>(initialItems);
   const [stats, setStats] = useState<TriageStat | null>(initialStats);
   const [applications, setApplications] = useState<JobApplication[]>(initialApplications);
+  const [engagements, setEngagements] = useState<CustomerEngagement[]>([]);
   const [dateScope, setDateScope] = useState<DateScope>('week');
   const [activeSurface, setActiveSurface] = useState<Surface>('now');
   const [now, setNow] = useState(new Date());
   const [paletteOpen, setPaletteOpen] = useState(false);
   const toast = useToast();
+
+  // Load engagements once for palette search
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('customer_engagements')
+        .select('id,company,stage,contact_name,contact_url')
+        .order('updated_at', { ascending: false });
+      if (!cancelled) setEngagements((data ?? []) as CustomerEngagement[]);
+    })();
+    const ch = supabase
+      .channel('engagement_palette')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_engagements' }, async () => {
+        const { data } = await supabase
+          .from('customer_engagements')
+          .select('id,company,stage,contact_name,contact_url')
+          .order('updated_at', { ascending: false });
+        if (!cancelled) setEngagements((data ?? []) as CustomerEngagement[]);
+      })
+      .subscribe();
+    return () => { cancelled = true; ch.unsubscribe(); };
+  }, []);
 
   // Tick clock
   useEffect(() => {
@@ -164,6 +189,8 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   }, [toast]);
 
   const handleReject = useCallback(async (id: string) => {
+    // Snapshot the previous status so we can undo
+    const previous = allItems.find((i) => i.id === id)?.action_status ?? null;
     const r = await fetch('/api/actions/reject', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -174,8 +201,23 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       throw new Error('Failed to reject');
     }
     setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'rejected' as const } : i)));
-    toast.push('info', 'Skipped');
-  }, [toast]);
+    toast.push('info', 'Skipped', {
+      label: 'Undo',
+      run: async () => {
+        const restoreStatus = previous ?? 'pending_review';
+        const { error } = await supabase
+          .from('triage_items')
+          .update({ action_status: restoreStatus })
+          .eq('id', id);
+        if (error) {
+          toast.push('error', 'Undo failed');
+        } else {
+          setAllItems((p) => p.map((i) => (i.id === id ? { ...i, action_status: restoreStatus as typeof i.action_status } : i)));
+          toast.push('success', 'Restored');
+        }
+      },
+    });
+  }, [toast, allItems]);
 
   const handleMarkFollowedUp = useCallback(async (id: string) => {
     const nowIso = new Date().toISOString();
@@ -226,7 +268,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     { id: 'all', label: 'All' },
   ];
 
-  // Build palette commands
+  // Build palette commands — nav + actions + engagements (jump-to)
   const paletteCommands: PaletteCommand[] = useMemo(() => {
     const cmds: PaletteCommand[] = [
       { id: 'go-now',      group: 'Navigate', label: 'Go to Now',      hint: 'g n', icon: PaletteIcons.Now,      run: () => setActiveSurface('now') },
@@ -248,8 +290,23 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       { id: 'open-booking', group: 'Action', label: 'Open booking link',
         run: () => { window.open('https://cal.read.ai/philippe-datakult/30-min', '_blank'); } },
     ];
+
+    // Engagements as jump-to commands
+    for (const e of engagements.slice(0, 30)) {
+      cmds.push({
+        id: `eng-${e.id}`,
+        group: 'Recent',
+        label: `${e.company}${e.contact_name ? ` · ${e.contact_name}` : ''}`,
+        hint: e.stage,
+        icon: PaletteIcons.Pipeline,
+        run: () => {
+          setActiveSurface('pipeline');
+          if (e.contact_url) window.open(e.contact_url, '_blank');
+        },
+      });
+    }
     return cmds;
-  }, [toast]);
+  }, [toast, engagements]);
 
   const renderSurface = () => {
     switch (activeSurface) {
