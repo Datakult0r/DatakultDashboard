@@ -75,6 +75,18 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     return () => clearInterval(t);
   }, []);
 
+  // Cross-component navigation events (used by NowSurface promote toast "View" action)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail === 'now' || detail === 'pipeline' || detail === 'intake' || detail === 'health') {
+        setActiveSurface(detail);
+      }
+    };
+    window.addEventListener('control-tower:goto', handler);
+    return () => window.removeEventListener('control-tower:goto', handler);
+  }, []);
+
   // Global keyboard shortcuts
   useEffect(() => {
     const isTyping = (el: EventTarget | null) => {
@@ -469,6 +481,15 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}
       />
+
+      {/* Mobile FAB to open the palette — Cmd+K isn't available on touch */}
+      <button
+        onClick={() => setPaletteOpen(true)}
+        aria-label="Command palette"
+        className="md:hidden fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full bg-accent text-base shadow-lg flex items-center justify-center hover:bg-accent-bright active:scale-95 transition-all"
+      >
+        <Command size={18} />
+      </button>
 
       <ChatWidget items={items} applications={applications} stats={stats} />
     </div>

@@ -54,12 +54,20 @@ export default function SystemHealthPanel() {
     try {
       const r = await fetch('/api/triage/run', { method: 'POST' });
       const data = await r.json();
-      if (r.ok && data.ok) {
-        toast.push('success', `Cron complete — ${data.result?.gmail?.fetched ?? 0} emails fetched`);
-        setRefreshKey((k) => k + 1);
+      const result = data.result || {};
+      if (result.gmail_needs_reauth) {
+        toast.push('error', 'Gmail OAuth needs re-auth — refresh token revoked', {
+          label: 'Console',
+          run: () => { window.open('https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0970726892', '_blank'); },
+        });
+      } else if (r.ok && data.ok) {
+        const fetched = result.gmail?.fetched ?? 0;
+        const inserted = result.gmail?.inserted ?? 0;
+        toast.push('success', `Cron complete — ${fetched} emails fetched, ${inserted} inserted`);
       } else {
-        toast.push('error', data.result?.errors?.[0] || data.error || 'Cron failed');
+        toast.push('error', result.errors?.[0] || data.error || 'Cron failed');
       }
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       toast.push('error', err instanceof Error ? err.message : 'Cron call failed');
     } finally {

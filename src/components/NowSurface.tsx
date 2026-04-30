@@ -53,7 +53,13 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
         }),
       });
       if (r.ok) {
-        toast.push('success', `Promoted to engagement: ${company}`);
+        toast.push('success', `Promoted: ${company}`, {
+          label: 'View',
+          run: () => {
+            // Switch to pipeline tab — best-effort; full nav handled by parent
+            window.dispatchEvent(new CustomEvent('control-tower:goto', { detail: 'pipeline' }));
+          },
+        });
       } else {
         toast.push('error', 'Failed to promote');
       }

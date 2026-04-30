@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
   // STEP 1: GMAIL (existing pipeline)
   // ══════════════════════════════════════════
   const gmailStart = Date.now();
+  let gmailNeedsReauth = false;
   try {
     const emails = await fetchUnreadEmails();
     results.gmail.fetched = emails.length;
@@ -164,8 +165,11 @@ export async function GET(request: NextRequest) {
     await logHealth(runId, 'gmail', 'fetch_and_score', 'ok', results.gmail.fetched, Date.now() - gmailStart);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    results.errors.push(`Gmail: ${msg}`);
-    await logHealth(runId, 'gmail', 'fetch_and_score', 'error', 0, Date.now() - gmailStart, msg);
+    // Classify Google OAuth re-auth signal so the dashboard can surface it precisely
+    gmailNeedsReauth = msg.includes('invalid_grant') || msg.toLowerCase().includes('refresh_token');
+    const tag = gmailNeedsReauth ? 'oauth_needs_reauth' : undefined;
+    results.errors.push(`Gmail${gmailNeedsReauth ? ' (OAUTH_REAUTH_REQUIRED)' : ''}: ${msg}`);
+    await logHealth(runId, 'gmail', 'fetch_and_score', 'error', 0, Date.now() - gmailStart, msg, tag);
   }
 
   // ══════════════════════════════════════════
@@ -558,6 +562,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: results.errors.length === 0,
+    gmail_needs_reauth: gmailNeedsReauth,
     duration_ms: duration,
     ...results,
     timestamp: new Date().toISOString(),
