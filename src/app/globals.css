@@ -11,7 +11,7 @@
 
   --color-primary:       #ecf0f2;
   --color-secondary:     #8c9499;
-  --color-tertiary:      #5a6166;
+  --color-tertiary:      #7c848a;  /* WCAG AA on base — was #5a6166 (3.0:1, fail) */
 
   --color-accent:        #7dd3a0;
   --color-accent-soft:   rgba(125, 211, 160, 0.12);

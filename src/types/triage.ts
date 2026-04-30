@@ -205,9 +205,36 @@ export interface NextAction {
   cover_letter: string | null;
   created_at: string;
   follow_up_at: string | null;
-  reason: 'pending_review' | 'sla_breach';
+  reason: 'pending_review' | 'sla_breach' | 'engagement_due';
   rank_score: number;
   reason_priority: number;
+}
+
+/** Row from weekly_wins view (single-row aggregate) */
+export interface WeeklyWins {
+  actions_taken: number;
+  actions_executed: number;
+  won_value_eur: number;
+  won_count: number;
+  outbound_sent: number;
+}
+
+/** Row from outbound_daily view */
+export interface OutboundDailyRow {
+  log_date: string;
+  count: number;
+}
+
+/** Single outbound log entry */
+export interface OutboundLog {
+  id: string;
+  created_at: string;
+  log_date: string;
+  contact_name: string | null;
+  contact_url: string | null;
+  channel: string | null;
+  context: string | null;
+  result: string | null;
 }
 
 /** Row from pipeline_health view */

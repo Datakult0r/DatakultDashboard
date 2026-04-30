@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, ExternalLink, Check, Mail, MessageSquare, Calendar, Globe, Smartphone, Cpu } from 'lucide-react';
+import { Copy, ExternalLink, Check, Mail, MessageSquare, Calendar, Globe, Smartphone, Cpu, Target } from 'lucide-react';
 import type { TriageItem, SourceType } from '@/types/triage';
 import SourceTag from './SourceTag';
 import ScoreChip from './ScoreChip';
@@ -25,12 +25,12 @@ const sourceIcon: Record<SourceType, typeof Mail> = {
   other: ExternalLink,
 };
 
-/**
- * Card for urgent/review items with source tag, title, score, draft reply, and hyperlinks
- */
+/** Card for urgent/review items with source tag, title, score, draft reply, hyperlinks, and a Promote-to-Engagement action. */
 export default function TriageCard({ item }: TriageCardProps) {
   const [isReplyExpanded, setIsReplyExpanded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promoted, setPromoted] = useState(false);
 
   const handleCopyReply = async () => {
     if (item.draft_reply) {
@@ -39,6 +39,32 @@ export default function TriageCard({ item }: TriageCardProps) {
       setTimeout(() => setIsCopied(false), 2000);
     }
   };
+
+  const handlePromote = async () => {
+    setPromoting(true);
+    try {
+      const company = item.company || item.contact_name || item.title.split(/[—–-]/)[0].trim();
+      const r = await fetch('/api/engagements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company,
+          contact_name: item.contact_name,
+          contact_email: item.contact_email,
+          contact_url: item.contact_url,
+          source: item.source,
+          stage: 'lead',
+          notes: item.subtitle || item.title,
+          triage_id: item.id,
+        }),
+      });
+      if (r.ok) setPromoted(true);
+    } finally {
+      setPromoting(false);
+    }
+  };
+
+  const promotable = !item.tags?.includes('engagement') && ['gmail','email','linkedin','linkedin_dm','beeper'].includes((item.source || '').toLowerCase());
 
   /** Resolve the best link for this item */
   const deepLink = item.contact_url || item.source_url || item.event_url || null;
@@ -163,19 +189,36 @@ export default function TriageCard({ item }: TriageCardProps) {
         </div>
       )}
 
-      {/* View source button */}
-      {deepLink && !item.draft_reply && (
-        <div className="mt-3 pt-3 border-t border-border/50">
-          <a
-            href={deepLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent/10 text-accent rounded hover:bg-accent/20 transition-colors"
-          >
-            <SourceIcon size={14} />
-            Open in {item.source}
-            <ExternalLink size={10} />
-          </a>
+      {/* Footer actions */}
+      {(deepLink || promotable) && (
+        <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
+          {deepLink && !item.draft_reply && (
+            <a
+              href={deepLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent/10 text-accent rounded hover:bg-accent/20 transition-colors"
+            >
+              <SourceIcon size={14} />
+              Open in {item.source}
+              <ExternalLink size={10} />
+            </a>
+          )}
+          {promotable && (
+            <button
+              onClick={handlePromote}
+              disabled={promoting || promoted}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ml-auto ${
+                promoted
+                  ? 'bg-success/10 text-success'
+                  : 'bg-money/10 text-money hover:bg-money/20'
+              } disabled:opacity-50`}
+              title="Create a customer engagement from this item"
+            >
+              {promoted ? <Check size={14} /> : <Target size={14} />}
+              {promoted ? 'Promoted' : 'Promote to engagement'}
+            </button>
+          )}
         </div>
       )}
     </div>

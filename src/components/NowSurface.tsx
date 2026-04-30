@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Zap, ExternalLink, Check, X, AlertTriangle } from 'lucide-react';
+import { Zap, ExternalLink, Check, X, AlertTriangle, Target } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { NextAction } from '@/types/triage';
 import SLABadge from './SLABadge';
+import WeeklyWinsBar from './WeeklyWinsBar';
+import OutboundCounter from './OutboundCounter';
 
 interface NowSurfaceProps {
   onApprove: (id: string) => Promise<void>;
@@ -63,60 +65,61 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
     }
   };
 
-  if (loading && actions.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-secondary text-sm">Loading the focus list…</p>
-      </div>
-    );
-  }
-
-  if (actions.length === 0) {
-    return (
-      <div className="text-center py-20 animate-fade-in">
-        <Zap size={32} className="mx-auto text-accent/50 mb-3" />
-        <p className="text-primary text-sm font-medium">Inbox zero.</p>
-        <p className="text-secondary text-xs mt-1">No actions waiting and no overdue follow-ups.</p>
-      </div>
-    );
-  }
-
+  const hasActions = actions.length > 0;
   const [hero, ...rest] = actions;
   const followUps = rest.slice(0, 5);
 
   return (
     <div className="space-y-6">
-      {/* Hero — the ONE thing */}
-      <HeroCard
-        action={hero}
-        busy={busy === hero.id}
-        onApprove={() => handleApprove(hero.id)}
-        onReject={() => handleReject(hero.id)}
-        onMark={() => handleMark(hero.id)}
-      />
-
-      {/* Below-the-fold: 5 follow-ups, dense list */}
-      {followUps.length > 0 && (
-        <div>
-          <div className="flex items-baseline justify-between mb-2 px-1">
-            <h3 className="text-[10px] uppercase tracking-[0.2em] text-tertiary font-mono">
-              Then these
-            </h3>
-            <span className="text-[10px] text-tertiary font-mono">{followUps.length} more</span>
-          </div>
-          <div className="bg-surface border border-border rounded-lg divide-y divide-border/40 overflow-hidden">
-            {followUps.map((a) => (
-              <FollowUpRow
-                key={a.id}
-                action={a}
-                busy={busy === a.id}
-                onApprove={() => handleApprove(a.id)}
-                onReject={() => handleReject(a.id)}
-                onMark={() => handleMark(a.id)}
-              />
-            ))}
-          </div>
+      {/* Wins + outbound row — visible above the fold even when there are no actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2">
+          <WeeklyWinsBar />
         </div>
+        <OutboundCounter />
+      </div>
+
+      {/* Hero or empty state */}
+      {loading && !hasActions ? (
+        <div className="text-center py-16">
+          <p className="text-secondary text-sm">Loading the focus list…</p>
+        </div>
+      ) : !hasActions ? (
+        <div className="text-center py-16 animate-fade-in bg-surface border border-border rounded-lg">
+          <Zap size={32} className="mx-auto text-accent/60 mb-3" />
+          <p className="text-primary text-sm font-medium">Inbox zero.</p>
+          <p className="text-secondary text-xs mt-1">No actions waiting and no overdue follow-ups.</p>
+        </div>
+      ) : (
+        <>
+          <HeroCard
+            action={hero}
+            busy={busy === hero.id}
+            onApprove={() => handleApprove(hero.id)}
+            onReject={() => handleReject(hero.id)}
+            onMark={() => handleMark(hero.id)}
+          />
+          {followUps.length > 0 && (
+            <div>
+              <div className="flex items-baseline justify-between mb-2 px-1">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] text-tertiary font-mono">Then these</h3>
+                <span className="text-[10px] text-tertiary font-mono">{followUps.length} more</span>
+              </div>
+              <div className="bg-surface border border-border rounded-lg divide-y divide-border/40 overflow-hidden">
+                {followUps.map((a) => (
+                  <FollowUpRow
+                    key={a.id}
+                    action={a}
+                    busy={busy === a.id}
+                    onApprove={() => handleApprove(a.id)}
+                    onReject={() => handleReject(a.id)}
+                    onMark={() => handleMark(a.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -130,19 +133,26 @@ interface CardProps {
   onMark: () => void;
 }
 
+function reasonMeta(reason: NextAction['reason']) {
+  switch (reason) {
+    case 'sla_breach':     return { icon: AlertTriangle, label: 'Overdue follow-up', color: 'text-danger' };
+    case 'engagement_due': return { icon: Target,        label: 'Engagement next step due', color: 'text-money' };
+    case 'pending_review':
+    default:               return { icon: Zap,           label: 'Next action', color: 'text-accent' };
+  }
+}
+
 function HeroCard({ action, busy, onApprove, onReject, onMark }: CardProps) {
+  const meta = reasonMeta(action.reason);
+  const Icon = meta.icon;
   const isBreach = action.reason === 'sla_breach';
   return (
     <div className="hero-card rounded-xl p-6 animate-fade-up">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
-          {isBreach ? (
-            <AlertTriangle size={16} className="text-danger" />
-          ) : (
-            <Zap size={16} className="text-accent" />
-          )}
+          <Icon size={16} className={meta.color} />
           <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
-            {isBreach ? 'Overdue follow-up' : 'Next action'}
+            {meta.label}
           </span>
           {action.priority !== null && (
             <span className="text-[10px] font-mono text-tertiary">P{action.priority}</span>
@@ -217,13 +227,21 @@ function HeroCard({ action, busy, onApprove, onReject, onMark }: CardProps) {
 }
 
 function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
+  const meta = reasonMeta(action.reason);
   const isBreach = action.reason === 'sla_breach';
+  const dotColor = action.reason === 'sla_breach'
+    ? 'var(--color-danger)'
+    : action.reason === 'engagement_due'
+      ? 'var(--color-money)'
+      : 'var(--color-accent)';
   return (
     <div className="px-4 py-3 flex items-center gap-3 hover:bg-elevated/30 transition-colors">
-      <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isBreach ? 'var(--color-danger)' : 'var(--color-accent)' }} />
+      <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />
       <div className="flex-1 min-w-0">
         <div className="text-sm text-primary font-medium truncate">{action.title}</div>
         <div className="flex items-center gap-2 text-[11px] text-tertiary font-mono">
+          <span className={meta.color}>{meta.label.split(' ')[0]}</span>
+          <span>·</span>
           <span>{action.source}</span>
           {action.priority !== null && <span>· P{action.priority}</span>}
           <SLABadge followUpAt={action.follow_up_at} compact />
