@@ -11,11 +11,19 @@ export default function WeeklyWinsBar() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const reload = async () => {
       const { data } = await supabase.from('weekly_wins').select('*').maybeSingle();
       if (!cancelled) setW((data as WeeklyWins | null) ?? null);
-    })();
-    return () => { cancelled = true; };
+    };
+    reload();
+    // Wins recompute when triage_items, customer_engagements, or outbound_log change.
+    const ch = supabase
+      .channel('weekly_wins_bar')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'triage_items' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_engagements' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'outbound_log' }, reload)
+      .subscribe();
+    return () => { cancelled = true; ch.unsubscribe(); };
   }, []);
 
   // Hide entirely when there are no wins — empty zero-zero-zero is demoralising

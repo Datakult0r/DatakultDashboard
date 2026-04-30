@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Send, Plus, Check, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Send, Plus, Check, ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { OutboundLog } from '@/types/triage';
@@ -153,8 +153,8 @@ export default function OutboundCounter() {
           {expanded && (
             <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
               {todayLogs.map((l) => (
-                <li key={l.id} className="text-[11px] flex items-baseline justify-between gap-2 hover:bg-elevated/30 px-1 py-0.5 rounded">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                <li key={l.id} className="text-[11px] flex items-center justify-between gap-2 hover:bg-elevated/30 px-1 py-0.5 rounded group">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {l.contact_url ? (
                       <a href={l.contact_url} target="_blank" rel="noopener noreferrer"
                         className="text-accent hover:text-accent-bright truncate inline-flex items-center gap-1">
@@ -169,6 +169,17 @@ export default function OutboundCounter() {
                   <span className="text-tertiary font-mono whitespace-nowrap">
                     {l.channel} · {format(new Date(l.created_at), 'HH:mm')}
                   </span>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Delete this outbound entry?')) return;
+                      await supabase.from('outbound_log').delete().eq('id', l.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-tertiary hover:text-danger transition-opacity p-0.5"
+                    aria-label="Delete entry"
+                    title="Delete"
+                  >
+                    <Trash2 size={10} />
+                  </button>
                 </li>
               ))}
             </ul>
