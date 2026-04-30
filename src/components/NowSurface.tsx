@@ -9,6 +9,7 @@ import SLABadge from './SLABadge';
 import WeeklyWinsBar from './WeeklyWinsBar';
 import OutboundCounter from './OutboundCounter';
 import MorningBriefing from './MorningBriefing';
+import NudgesPanel from './NudgesPanel';
 import { useToast } from './Toast';
 
 interface NowSurfaceProps {
@@ -123,8 +124,11 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
         </div>
       )}
 
-      {/* Chief of staff morning briefing — one-paragraph context */}
+      {/* Chief of staff morning briefing — one-paragraph context (Claude) */}
       <MorningBriefing />
+
+      {/* Heuristic nudges — works without Claude, computes from existing data */}
+      <NudgesPanel />
 
       {/* Wins + outbound row — visible above the fold even when there are no actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

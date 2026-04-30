@@ -11,10 +11,19 @@ import {
   Clock,
   RefreshCw,
   Play,
+  Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SystemHealthRow } from '@/types/triage';
 import { useToast } from './Toast';
+
+interface AnthropicTest {
+  status: 'ok' | 'no_credits' | 'invalid_key' | 'rate_limited' | 'network_error' | 'unknown';
+  message?: string;
+  keyMasked?: string;
+  keyLength?: number;
+  httpStatus?: number;
+}
 
 /**
  * SystemHealthPanel — Operational visibility into the triage automation pipeline.
@@ -29,7 +38,36 @@ export default function SystemHealthPanel() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [running, setRunning] = useState(false);
+  const [anthropic, setAnthropic] = useState<AnthropicTest | null>(null);
+  const [testingAnthropic, setTestingAnthropic] = useState(false);
   const toast = useToast();
+
+  const testAnthropic = async () => {
+    setTestingAnthropic(true);
+    try {
+      const r = await fetch('/api/anthropic/test', { cache: 'no-store' });
+      const data = await r.json();
+      setAnthropic(data as AnthropicTest);
+      if (data.status === 'ok') {
+        toast.push('success', 'Anthropic API working — credits available');
+      } else if (data.status === 'no_credits') {
+        toast.push('error', 'Anthropic credits exhausted', {
+          label: 'Billing',
+          run: () => { window.open('https://console.anthropic.com/settings/billing', '_blank'); },
+        });
+      } else {
+        toast.push('error', `Anthropic test: ${data.status}`);
+      }
+    } finally {
+      setTestingAnthropic(false);
+    }
+  };
+
+  // Auto-test once on mount so the user sees the state without clicking
+  useEffect(() => {
+    testAnthropic();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runApproved = async () => {
     if (!confirm('Mark all approved items as executed (clears the SLA queue)?')) return;
@@ -139,6 +177,51 @@ export default function SystemHealthPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Anthropic API credit status — first because it gates briefing + cron scoring */}
+      {anthropic && (
+        <div className={`bg-surface border rounded-lg p-3 flex items-center gap-3 ${
+          anthropic.status === 'ok' ? 'border-success/30' :
+          anthropic.status === 'no_credits' ? 'border-danger/40' :
+          'border-warning/30'
+        }`}>
+          <Sparkles size={14} className={
+            anthropic.status === 'ok' ? 'text-success' :
+            anthropic.status === 'no_credits' ? 'text-danger' :
+            'text-warning'
+          } />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-primary flex items-center gap-2">
+              Anthropic API
+              <span className={`text-[10px] font-mono uppercase ${
+                anthropic.status === 'ok' ? 'text-success' :
+                anthropic.status === 'no_credits' ? 'text-danger' :
+                'text-warning'
+              }`}>
+                {anthropic.status}
+              </span>
+            </div>
+            <div className="text-[11px] text-tertiary font-mono mt-0.5">
+              {anthropic.keyMasked ? `key ${anthropic.keyMasked} (${anthropic.keyLength} chars)` : 'no key info'}
+              {anthropic.httpStatus ? ` · HTTP ${anthropic.httpStatus}` : ''}
+            </div>
+            {anthropic.status === 'no_credits' && (
+              <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer"
+                className="text-[11px] text-danger underline underline-offset-2 hover:no-underline">
+                Open billing →
+              </a>
+            )}
+          </div>
+          <button
+            onClick={testAnthropic}
+            disabled={testingAnthropic}
+            className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary disabled:opacity-50 inline-flex items-center gap-1.5"
+          >
+            <RefreshCw size={11} className={testingAnthropic ? 'animate-spin' : ''} />
+            Re-test
+          </button>
+        </div>
+      )}
+
       {/* Header card — overall pipeline health at a glance */}
       <div className="bg-surface border border-border rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
