@@ -7,7 +7,7 @@ import { discoverJobs } from '@/lib/apify';
 import { discoverJobsRemoteOK } from '@/lib/remoteok';
 import { scoreJobs } from '@/lib/job-scoring';
 import { tailorCVForJobs } from '@/lib/cv-tailor';
-import { scrapeIntelligence, scrapeCareerPage } from '@/lib/firecrawl';
+import { scrapeIntelligence, scrapeCareerPage, scrapeCompanyAbout } from '@/lib/firecrawl';
 import { fetchPerplexityNews } from '@/lib/perplexity';
 import { generateContentDrafts } from '@/lib/content-engine';
 
@@ -379,7 +379,42 @@ export async function GET(request: NextRequest) {
           await supabaseServer.from('philippe_jobs').insert(philippeJobs);
         }
 
-        // ── CV Tailoring for strong jobs ──
+        // ── Firecrawl: company About-page enrichment for top 3 STRONG_APPLY ──
+        // Runs only if FIRECRAWL_API_KEY is set, capped at 3 calls per cron to stay
+        // within the 500/month free tier (approx 90 calls/month at this rate).
+        if (process.env.FIRECRAWL_API_KEY) {
+          const top3 = scoringResult.scored
+            .filter((s) => s.scoreLabel === 'strong' && !s.disqualified)
+            .slice(0, 3);
+          let fcOk = 0; let fcErr = 0;
+          const fcStart = Date.now();
+          for (const s of top3) {
+            try {
+              const enrichment = await scrapeCompanyAbout(s.job.company);
+              if (enrichment.about) {
+                await supabaseServer
+                  .from('philippe_jobs')
+                  .update({
+                    application_requirements:
+                      `Company context (Firecrawl): ${enrichment.about.slice(0, 1500)}`,
+                  })
+                  .eq('company', s.job.company)
+                  .eq('job_url', s.job.jobUrl);
+                fcOk += 1;
+              } else if (enrichment.error) {
+                fcErr += 1;
+              }
+            } catch {
+              fcErr += 1;
+            }
+          }
+          await logHealth(runId, 'firecrawl', 'enrich_company',
+            fcOk > 0 ? 'ok' : (fcErr > 0 ? 'fallback' : 'skipped'),
+            fcOk, Date.now() - fcStart,
+            fcErr > 0 ? `${fcErr} errors out of ${top3.length}` : undefined);
+        }
+
+                // ── CV Tailoring for strong jobs ──
         const strongForCV = scoringResult.scored
           .filter((s) => s.scoreLabel === 'strong' && !s.disqualified)
           .slice(0, 5);

@@ -306,3 +306,95 @@ export async function scrapeCareerPage(companyName: string, jobTitle: string): P
 }
 
 export type { NewsItem, ContentSource, FirecrawlResult };
+
+
+/**
+ * v3.2.5+ enrichment helpers using the existing scrapeUrl primitive.
+ * Budget-aware: every call is capped, errors are caught, callers always continue.
+ */
+
+export interface CompanyEnrichment {
+  about: string | null;
+  url: string | null;
+  durationMs: number;
+  error: string | null;
+}
+
+/** Slugify a company name for best-effort domain guesses. */
+function slugifyDomain(company: string): string {
+  return company
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .slice(0, 30);
+}
+
+/**
+ * Scrape a company\'s About page for cover-letter context.
+ * Falls back across /about, /about-us, root domain. Truncates to 2000 chars.
+ * Caps a single attempt at ~12s to keep cron under budget.
+ */
+export async function scrapeCompanyAbout(company: string): Promise<CompanyEnrichment> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) return { about: null, url: null, durationMs: 0, error: 'FIRECRAWL_API_KEY missing' };
+  if (!company) return { about: null, url: null, durationMs: 0, error: 'no company' };
+
+  const slug = slugifyDomain(company);
+  if (!slug) return { about: null, url: null, durationMs: 0, error: 'unparseable company' };
+
+  const candidates = [
+    `https://${slug}.com/about`,
+    `https://${slug}.com/about-us`,
+    `https://www.${slug}.com/about`,
+    `https://${slug}.com`,
+  ];
+  const start = Date.now();
+  for (const url of candidates) {
+    try {
+      const page = await scrapeUrl(apiKey, url);
+      if (page && page.markdown.length > 300) {
+        return {
+          about: page.markdown.slice(0, 2000),
+          url,
+          durationMs: Date.now() - start,
+          error: null,
+        };
+      }
+    } catch (err) {
+      // Try the next candidate; only return the last error
+      if (url === candidates[candidates.length - 1]) {
+        return { about: null, url: null, durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+  }
+  return { about: null, url: null, durationMs: Date.now() - start, error: 'no usable about page' };
+}
+
+export interface EventEnrichment {
+  details: string | null;
+  durationMs: number;
+  error: string | null;
+}
+
+/**
+ * Scrape an event landing page for date/speaker/registration enrichment.
+ * Returns trimmed markdown the cron can attach to a triage_items row.
+ */
+export async function scrapeEventDetails(eventUrl: string): Promise<EventEnrichment> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) return { details: null, durationMs: 0, error: 'FIRECRAWL_API_KEY missing' };
+  if (!eventUrl || !eventUrl.startsWith('http')) return { details: null, durationMs: 0, error: 'invalid url' };
+
+  const start = Date.now();
+  try {
+    const page = await scrapeUrl(apiKey, eventUrl);
+    if (!page) return { details: null, durationMs: Date.now() - start, error: 'no page' };
+    return {
+      details: page.markdown.slice(0, 1500),
+      durationMs: Date.now() - start,
+      error: null,
+    };
+  } catch (err) {
+    return { details: null, durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) };
+  }
+}
