@@ -49,7 +49,7 @@ export default function PipelineSurface({ applications, onApplicationStatusChang
 
   const subtabs: { id: PipelineSubtab; label: string; icon: React.ReactNode; count: number }[] = [
     { id: 'jobs',      label: 'Scored Jobs', icon: <Briefcase size={14} />, count: jobsTotal },
-    { id: 'customers', label: 'Customers',   icon: <Target size={14} />,    count: totalActive },
+    { id: 'customers', label: 'Leads',       icon: <Target size={14} />,    count: totalActive },
     { id: 'applied',   label: 'Applied',     icon: <Briefcase size={14} />, count: applications.length },
   ];
 
@@ -58,7 +58,7 @@ export default function PipelineSurface({ applications, onApplicationStatusChang
       {(totalActive > 0 || weightedActive > 0 || (wonStage && wonStage.count > 0) || activeApps > 0 || jobsTotal > 0) && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <SummaryTile label="Scored jobs" value={jobsTotal.toString()} color="info" icon={<Briefcase size={14} />} />
-          <SummaryTile label="Active customers" value={totalActive.toString()} color="accent" icon={<Target size={14} />} />
+          <SummaryTile label="Active leads" value={totalActive.toString()} color="accent" icon={<Target size={14} />} />
           <SummaryTile label="Weighted pipeline" value={`€${weightedActive.toLocaleString()}`} color="money" icon={<Target size={14} />} />
           <SummaryTile label="Deals won" value={(wonStage?.count ?? 0).toString()} color="success" icon={<Target size={14} />} />
         </div>

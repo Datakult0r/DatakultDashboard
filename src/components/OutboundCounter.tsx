@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Send, Plus, Check, ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,18 @@ const DAILY_QUOTA = 5;
 export default function OutboundCounter() {
   const [todayLogs, setTodayLogs] = useState<OutboundLog[]>([]);
   const [adding, setAdding] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onOpen = () => {
+      setAdding(true);
+      setTimeout(() => {
+        containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 80);
+    };
+    window.addEventListener('control-tower:open-outbound-form', onOpen as EventListener);
+    return () => window.removeEventListener('control-tower:open-outbound-form', onOpen as EventListener);
+  }, []);
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('linkedin');
@@ -70,7 +82,7 @@ export default function OutboundCounter() {
         : { text: 'text-danger', bg: 'bg-danger' };
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4">
+    <div ref={containerRef} className="bg-surface border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <Send size={14} className={tone.text} />

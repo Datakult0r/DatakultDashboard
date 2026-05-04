@@ -10,7 +10,7 @@ export interface Nudge {
   severity: 'info' | 'warning' | 'danger';
   title: string;
   body: string;
-  cta?: { label: string; href?: string; goto?: 'now' | 'pipeline' | 'intake' | 'health' };
+  cta?: { label: string; href?: string; goto?: 'now' | 'pipeline' | 'intake' | 'health' | 'open-outbound-form' | 'scroll-approval-queue' };
 }
 
 /**
@@ -53,7 +53,7 @@ export async function GET() {
         severity: 'danger',
         title: 'No outbound today',
         body: 'Block 9-11am to log five prospect touches. The dashboard will track them.',
-        cta: { label: 'Log a touch', goto: 'now' },
+        cta: { label: 'Log a touch', goto: 'open-outbound-form' },
       });
     } else if (todayCount < 5) {
       nudges.push({
@@ -62,7 +62,7 @@ export async function GET() {
         severity: 'warning',
         title: `${todayCount}/5 outbound touches today`,
         body: `${5 - todayCount} more to hit the daily quota.`,
-        cta: { label: 'Log a touch', goto: 'now' },
+        cta: { label: 'Log a touch', goto: 'open-outbound-form' },
       });
     }
 
@@ -109,7 +109,7 @@ export async function GET() {
         severity: 'danger',
         title: `${breachCount} approved item${breachCount === 1 ? '' : 's'} overdue`,
         body: 'Either follow up now, or mark them executed if you handled them outside the dashboard.',
-        cta: { label: 'Open Now', goto: 'now' },
+        cta: { label: 'Review queue', goto: 'scroll-approval-queue' },
       });
     }
 

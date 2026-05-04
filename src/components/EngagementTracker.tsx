@@ -96,7 +96,7 @@ export default function EngagementTracker() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Target size={16} className="text-accent" />
-          <h3 className="text-sm font-semibold text-primary">Customer Pipeline</h3>
+          <h3 className="text-sm font-semibold text-primary">Sales Leads Pipeline</h3>
           {totalActiveValue > 0 && (
             <span className="text-[11px] font-mono text-money">
               €{totalActiveValue.toLocaleString()} weighted

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ExternalLink, Trash2, Edit3, Save, X, Globe2, FileText, Percent } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CustomerEngagement, EngagementStage } from '@/types/triage';
+import CardMeta from './CardMeta';
 
 interface EngagementCardProps {
   engagement: CustomerEngagement;
@@ -116,6 +117,21 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
           )}
         </div>
       </div>
+
+      {!editing && (
+        <div className="mb-2">
+          <CardMeta
+            source={engagement.source}
+            category="review"
+            actionType={'promote_to_engagement'}
+            company={engagement.company}
+            contactName={engagement.contact_name && engagement.contact_name !== engagement.company ? engagement.contact_name : null}
+            contactUrl={engagement.contact_url}
+            contactEmail={engagement.contact_email}
+            compact
+          />
+        </div>
+      )}
 
       {/* Contact */}
       {editing ? (

@@ -40,7 +40,11 @@ const NEWS_QUERIES = [
     category: 'ai_news' as const,
   },
   {
-    query: 'What AI events, hackathons, and competitions are happening in Europe in the next 30 days? Include virtual events. Focus on generative AI, LLMs, agentic AI, and EdTech.',
+    query: 'What are the upcoming AI conferences, summits, and meetups happening in Switzerland (Zurich, Geneva, Basel, Lausanne) in the next 90 days? Include Swiss AI Days, Swiss AI Forum, ETH/EPFL events, AI Forum Switzerland, AMLD Lausanne, Applied Machine Learning Days, Microsoft Azure events, and any GenAI/LLM/agentic AI events. Include date, venue, registration URL.',
+    category: 'event' as const,
+  },
+  {
+    query: 'What are the upcoming AI events, hackathons, and competitions in Europe (Lisbon, Berlin, London, Amsterdam, Paris) in the next 60 days? Focus on generative AI, LLMs, agentic AI, MLOps, EdTech, and AI for enterprise. Include date, venue, registration URL.',
     category: 'event' as const,
   },
   {

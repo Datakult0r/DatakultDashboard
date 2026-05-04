@@ -3,7 +3,7 @@
  * Includes AG-UI / A2UI action types for the agentic approval queue
  */
 
-export type TriageCategory = 'urgent' | 'review' | 'job' | 'news' | 'schedule' | 'done';
+export type TriageCategory = 'urgent' | 'review' | 'job' | 'news' | 'event' | 'schedule' | 'done';
 export type TriageStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type ScoreLabel = 'strong' | 'apply' | 'light' | 'skip' | 'priority';
 export type SourceType = 'email' | 'gmail' | 'gmail_personal' | 'linkedin' | 'linkedin_dm' | 'beeper' | 'whatsapp' | 'calendar' | 'system' | 'remoteok' | 'wttj' | 'other';

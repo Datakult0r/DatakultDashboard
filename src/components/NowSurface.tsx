@@ -5,6 +5,7 @@ import { Zap, ExternalLink, Check, X, AlertTriangle, Target } from 'lucide-react
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { NextAction } from '@/types/triage';
+import CardMeta from './CardMeta';
 import SLABadge from './SLABadge';
 import WeeklyWinsBar from './WeeklyWinsBar';
 import OutboundCounter from './OutboundCounter';
@@ -269,8 +270,19 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
         {action.title}
       </h2>
       {action.subtitle && (
-        <p className="text-sm text-secondary/80 mb-4 line-clamp-3 leading-relaxed">{action.subtitle}</p>
+        <p className="text-sm text-secondary/80 mb-3 line-clamp-3 leading-relaxed">{action.subtitle}</p>
       )}
+
+      {/* Provenance + action + who — uniform meta strip */}
+      <div className="mb-4">
+        <CardMeta
+          source={action.source}
+          category={action.category}
+          actionType={action.action_type}
+          contactName={action.contact_name}
+          contactUrl={action.contact_url}
+        />
+      </div>
 
       {/* Contact + time */}
       <div className="flex items-center gap-2 text-[11px] text-tertiary font-mono mb-5 flex-wrap">
@@ -366,17 +378,25 @@ function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
   return (
     <div className={`px-4 py-3 flex items-center gap-3 hover:bg-elevated/40 transition-all border-l-2 ${borderColor} border-l-opacity-60`}>
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-primary font-medium truncate">{action.title}</div>
-        <div className="flex items-center gap-2 text-[10px] text-tertiary font-mono mt-0.5">
-          <span className={`${meta.color} font-medium`}>{meta.label.split(' ')[0]}</span>
-          <span className="opacity-40">·</span>
-          <span>{action.source}</span>
-          {action.priority !== null && (
-            <>
-              <span className="opacity-40">·</span>
-              <span>P{action.priority}</span>
-            </>
-          )}
+        <div className="text-sm text-primary font-medium truncate" title={action.title}>{action.title}</div>
+        {action.subtitle && (
+          <div className="text-[11px] text-secondary/80 line-clamp-1 mt-0.5" title={action.subtitle}>
+            {action.subtitle}
+          </div>
+        )}
+        <div className="mt-1 flex items-center gap-2 flex-wrap">
+          <CardMeta
+            source={action.source}
+            category={action.category}
+            actionType={action.action_type}
+            contactName={action.contact_name}
+            contactUrl={action.contact_url}
+            compact
+          />
+          <span className="text-[10px] font-mono text-tertiary">
+            <span className={`${meta.color} font-medium`}>{meta.label.split(' ')[0]}</span>
+            {action.priority !== null && <> · P{action.priority}</>}
+          </span>
           <SLABadge followUpAt={action.follow_up_at} compact />
         </div>
       </div>

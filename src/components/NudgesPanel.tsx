@@ -69,9 +69,23 @@ function NudgeRow({ nudge }: { nudge: Nudge }) {
   const handleCta = () => {
     if (nudge.cta?.href) {
       window.open(nudge.cta.href, '_blank');
-    } else if (nudge.cta?.goto) {
-      window.dispatchEvent(new CustomEvent('control-tower:goto', { detail: nudge.cta.goto }));
+      return;
     }
+    if (!nudge.cta?.goto) return;
+    const detail = nudge.cta.goto;
+    // Special action events that components opt into:
+    if (detail === 'open-outbound-form') {
+      window.dispatchEvent(new CustomEvent('control-tower:open-outbound-form'));
+      window.dispatchEvent(new CustomEvent('control-tower:goto', { detail: 'now' }));
+      return;
+    }
+    if (detail === 'scroll-approval-queue') {
+      window.dispatchEvent(new CustomEvent('control-tower:scroll-approval-queue'));
+      window.dispatchEvent(new CustomEvent('control-tower:goto', { detail: 'now' }));
+      return;
+    }
+    // Fallback: surface switch (e.g. 'pipeline')
+    window.dispatchEvent(new CustomEvent('control-tower:goto', { detail }));
   };
 
   return (

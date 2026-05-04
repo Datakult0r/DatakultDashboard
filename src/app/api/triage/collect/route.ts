@@ -201,47 +201,61 @@ export async function GET(request: NextRequest) {
       await logHealth(runId, 'calendar', 'fetch_events', 'ok', calendarResult.events.length, calendarResult.durationMs);
     }
 
+    // Calendar events are NOT inserted into triage_items anymore — Philippe already
+    // sees those in his actual calendar. Only events that need prep (no description,
+    // no notes, future <= 24h, has external attendees) become a triage row to nudge prep.
     if (calendarResult.events.length > 0) {
-      const calendarItems = calendarResult.events.map((event) => ({
-        title: event.summary,
-        subtitle: [
-          event.location,
-          event.attendees.length > 0 ? `${event.attendees.length} attendees` : null,
-          event.description?.slice(0, 150),
-        ].filter(Boolean).join(' · ') || null,
-        source: 'calendar',
-        category: 'schedule' as const,
-        score: 0,
-        score_label: null,
-        priority: event.isAllDay ? 3 : 5,
-        tags: [
-          event.isAllDay ? 'all-day' : 'meeting',
-          event.meetLink || event.hangoutLink ? 'video-call' : null,
-        ].filter(Boolean) as string[],
-        contact_name: event.organizer,
-        event_time: event.start,
-        event_end_time: event.end,
-        event_location: event.location,
-        event_url: event.meetLink || event.hangoutLink || event.htmlLink,
-        source_url: event.htmlLink,
-        triage_date: today,
-      }));
+      const now = Date.now();
+      const next24h = now + 24 * 60 * 60 * 1000;
+      const prepNeeded = calendarResult.events.filter((event) => {
+        const startMs = new Date(event.start).getTime();
+        if (Number.isNaN(startMs) || startMs < now || startMs > next24h) return false;
+        const hasPrep = (event.description ?? '').length > 50;
+        const hasExternalAttendees = event.attendees.length >= 2;
+        return !hasPrep && hasExternalAttendees;
+      });
 
-      const { data, error } = await supabaseServer
-        .from('triage_items')
-        .insert(calendarItems)
-        .select('id');
-      if (error) {
-        if (error.code === '23505' || error.message?.includes('duplicate key')) {
-          // Calendar events already inserted today — idempotency is doing its job.
-          await logHealth(runId, 'calendar', 'fetch_events', 'fallback',
-            calendarResult.events.length, Date.now() - calendarStart, undefined, 'idempotency_index');
-          results.calendar.inserted = 0;
+      if (prepNeeded.length > 0) {
+        const prepItems = prepNeeded.slice(0, 5).map((event) => ({
+          title: `Prep needed: ${event.summary}`,
+          subtitle: [
+            event.location,
+            `${event.attendees.length} attendees`,
+            'No prep notes — open & write a 1-line agenda',
+          ].filter(Boolean).join(' · '),
+          source: 'calendar',
+          category: 'schedule' as const,
+          score: 0,
+          score_label: null,
+          priority: 7,
+          tags: ['meeting', 'prep-needed'],
+          contact_name: event.organizer,
+          event_time: event.start,
+          event_end_time: event.end,
+          event_location: event.location,
+          event_url: event.meetLink || event.hangoutLink || event.htmlLink,
+          source_url: event.htmlLink,
+          triage_date: today,
+        }));
+
+        const { data, error } = await supabaseServer
+          .from('triage_items')
+          .insert(prepItems)
+          .select('id');
+        if (error) {
+          if (error.code === '23505' || error.message?.includes('duplicate key')) {
+            // Same prep-needed meetings already flagged today — idempotency working.
+            await logHealth(runId, 'calendar', 'fetch_events', 'fallback',
+              prepNeeded.length, Date.now() - calendarStart, undefined, 'idempotency_index');
+            results.calendar.inserted = 0;
+          } else {
+            throw new Error(error.message);
+          }
         } else {
-          throw new Error(error.message);
+          results.calendar.inserted = data?.length || 0;
         }
       } else {
-        results.calendar.inserted = data?.length || 0;
+        results.calendar.inserted = 0;
       }
     }
   } catch (err) {
@@ -431,7 +445,9 @@ export async function GET(request: NextRequest) {
           title: item.title,
           subtitle: item.summary,
           source: 'system',
-          category: 'news' as const,
+          category: (item.category === 'event' || item.category === 'competition'
+            ? 'event'
+            : 'news') as 'event' | 'news',
           score: 0,
           score_label: null,
           priority: item.category === 'event' ? 6 : item.category === 'competition' ? 7 : item.category === 'thought_leadership' ? 5 : 4,
