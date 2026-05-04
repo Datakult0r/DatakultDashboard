@@ -11,6 +11,8 @@ import WeeklyWinsBar from './WeeklyWinsBar';
 import OutboundCounter from './OutboundCounter';
 import MorningBriefing from './MorningBriefing';
 import NudgesPanel from './NudgesPanel';
+import AgentRunSheet from './AgentRunSheet';
+import YourQueue from './YourQueue';
 import { useToast } from './Toast';
 
 interface NowSurfaceProps {
@@ -142,8 +144,14 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
       {/* Chief of staff morning briefing — one-paragraph context (Claude) */}
       <MorningBriefing />
 
+      {/* AGENT lane — what the cron did/will do */}
+      <AgentRunSheet />
+
       {/* Heuristic nudges — works without Claude, computes from existing data */}
       <NudgesPanel />
+
+      {/* YOUR lane — items the agent prepared, only you can finish */}
+      <YourQueue />
 
       {/* Wins + outbound row — visible above the fold even when there are no actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

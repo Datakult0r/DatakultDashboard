@@ -2,7 +2,11 @@
   "crons": [
     {
       "path": "/api/triage/collect",
-      "schedule": "0 6 * * *"
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/jobs/auto-apply",
+      "schedule": "0 9 * * *"
     }
   ]
 }

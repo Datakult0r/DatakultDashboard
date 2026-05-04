@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import type { JobApplication, ApplicationStatus, PipelineHealthRow } from '@/types/triage';
 import EngagementTracker from './EngagementTracker';
 import JobsTracker from './JobsTracker';
+import AutoApplyQueue from './AutoApplyQueue';
 import ApplicationTracker from './ApplicationTracker';
 
 interface PipelineSurfaceProps {
@@ -89,7 +90,10 @@ export default function PipelineSurface({ applications, onApplicationStatusChang
       </div>
 
       {subtab === 'jobs' ? (
-        <JobsTracker />
+        <div className="space-y-4">
+          <AutoApplyQueue />
+          <JobsTracker />
+        </div>
       ) : subtab === 'customers' ? (
         <EngagementTracker />
       ) : (
