@@ -71,7 +71,7 @@ export default function OutboundCounter() {
 
   return (
     <div className="bg-surface border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <Send size={14} className={tone.text} />
           <h3 className="text-sm font-semibold text-primary">Outbound today</h3>
@@ -81,6 +81,9 @@ export default function OutboundCounter() {
           {today} / {DAILY_QUOTA}
         </span>
       </div>
+      <p className="text-[10px] text-tertiary/80 mb-3 leading-snug">
+        Daily 5-touch goal — log every prospect message you send (LinkedIn DM, email, event ping) so the dashboard can hold you accountable.
+      </p>
 
       <div className="h-1.5 bg-elevated rounded-full overflow-hidden mb-3">
         <div className={`h-full ${tone.bg} animate-fill`} style={{ width: `${pct}%` }} />

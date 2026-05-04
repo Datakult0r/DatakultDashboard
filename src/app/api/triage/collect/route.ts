@@ -158,12 +158,24 @@ export async function GET(request: NextRequest) {
           .from('triage_items')
           .insert(triageItems)
           .select('id');
-        if (error) throw new Error(error.message);
-        results.gmail.inserted = data?.length || 0;
+        if (error) {
+          if (error.code === '23505' || error.message?.includes('duplicate key')) {
+            // Idempotency: rows already inserted today. Not a real error.
+            await logHealth(runId, 'gmail', 'fetch_and_score', 'fallback', 0,
+              Date.now() - gmailStart, undefined, 'idempotency_index');
+            results.gmail.inserted = 0;
+          } else {
+            throw new Error(error.message);
+          }
+        } else {
+          results.gmail.inserted = data?.length || 0;
+        }
       }
     }
 
-    await logHealth(runId, 'gmail', 'fetch_and_score', 'ok', results.gmail.fetched, Date.now() - gmailStart);
+    if (results.gmail.inserted > 0 || results.gmail.fetched > 0) {
+      await logHealth(runId, 'gmail', 'fetch_and_score', 'ok', results.gmail.fetched, Date.now() - gmailStart);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // Classify Google OAuth re-auth signal so the dashboard can surface it precisely
@@ -219,8 +231,18 @@ export async function GET(request: NextRequest) {
         .from('triage_items')
         .insert(calendarItems)
         .select('id');
-      if (error) throw new Error(error.message);
-      results.calendar.inserted = data?.length || 0;
+      if (error) {
+        if (error.code === '23505' || error.message?.includes('duplicate key')) {
+          // Calendar events already inserted today — idempotency is doing its job.
+          await logHealth(runId, 'calendar', 'fetch_events', 'fallback',
+            calendarResult.events.length, Date.now() - calendarStart, undefined, 'idempotency_index');
+          results.calendar.inserted = 0;
+        } else {
+          throw new Error(error.message);
+        }
+      } else {
+        results.calendar.inserted = data?.length || 0;
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -309,8 +331,16 @@ export async function GET(request: NextRequest) {
             .from('triage_items')
             .insert(jobItems)
             .select('id');
-          if (error) throw new Error(error.message);
-          results.jobs.inserted = data?.length || 0;
+          if (error) {
+            if (error.code === '23505' || error.message?.includes('duplicate key')) {
+              // Same job URLs already inserted today — idempotency.
+              results.jobs.inserted = 0;
+            } else {
+              throw new Error(error.message);
+            }
+          } else {
+            results.jobs.inserted = data?.length || 0;
+          }
         }
 
         // Also write to philippe_jobs for persistent tracking

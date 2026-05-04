@@ -37,10 +37,15 @@ export default function NudgesPanel() {
 
   return (
     <div className="bg-surface border border-border rounded-lg overflow-hidden">
-      <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2">
-        <Lightbulb size={12} className="text-money" />
-        <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
-          Nudges · {nudges.length}
+      <div className="px-3 py-2 border-b border-border/40 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Lightbulb size={12} className="text-money" />
+          <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
+            Daily nudges · {nudges.length}
+          </span>
+        </div>
+        <span className="text-[10px] text-tertiary/70 italic hidden sm:block">
+          Heuristic suggestions based on today&apos;s activity
         </span>
       </div>
       <ul className="divide-y divide-border/40">

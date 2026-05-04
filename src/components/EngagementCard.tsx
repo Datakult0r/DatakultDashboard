@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, Trash2, Edit3, Save, X } from 'lucide-react';
+import { ExternalLink, Trash2, Edit3, Save, X, Globe2, FileText, Percent } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CustomerEngagement, EngagementStage } from '@/types/triage';
 
@@ -73,7 +73,22 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
             className="flex-1 bg-elevated border border-border rounded px-2 py-1 text-sm font-semibold text-primary focus:outline-none focus:border-accent"
           />
         ) : (
-          <h4 className="text-base font-semibold text-primary leading-tight">{engagement.company}</h4>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider text-tertiary">
+              {engagement.source && (
+                <span className="inline-flex items-center gap-1">
+                  <Globe2 size={9} /> {engagement.source.replace('_', ' ')}
+                </span>
+              )}
+              {engagement.probability != null && engagement.probability > 0 && (
+                <>
+                  <span className="opacity-30">·</span>
+                  <span className="inline-flex items-center gap-0.5"><Percent size={9} />{engagement.probability}</span>
+                </>
+              )}
+            </div>
+            <h4 className="text-base font-semibold text-primary leading-tight mt-0.5">{engagement.company}</h4>
+          </div>
         )}
         <div className="flex items-center gap-1">
           {editing ? (
@@ -126,7 +141,7 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
             className="w-full bg-elevated border border-border rounded px-2 py-1 text-xs text-secondary"
           />
         </div>
-      ) : engagement.contact_name && (
+      ) : (engagement.contact_name && engagement.contact_name !== engagement.company) && (
         <div className="text-xs text-secondary mb-2 flex items-center gap-2">
           {engagement.contact_url ? (
             <a href={engagement.contact_url} target="_blank" rel="noopener noreferrer"
@@ -145,7 +160,15 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
         </div>
       )}
 
-      {/* Value + probability — only render if editing or value>0 (avoid €0 noise) */}
+      {/* Notes preview — many engagements only have notes (no value/next-step set) */}
+      {!editing && engagement.notes && (
+        <div className="text-[11px] text-secondary/80 leading-snug mb-3 line-clamp-2 flex gap-1">
+          <FileText size={11} className="text-tertiary mt-0.5 shrink-0" />
+          <span>{engagement.notes}</span>
+        </div>
+      )}
+
+            {/* Value + probability — only render if editing or value>0 (avoid €0 noise) */}
       {showFinancials && (
         <div className="flex items-center gap-3 text-[11px] font-mono mb-3">
           {editing ? (
