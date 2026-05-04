@@ -1,179 +1,144 @@
 /**
- * Browser Use Cloud v3 integration for LinkedIn Easy Apply.
- * Most subtle agent — best anti-detection for LinkedIn operations.
+ * Browser Use Cloud integration for LinkedIn Easy Apply.
+ *
+ * API contract (verified May 2026):
+ *   - Base URL: https://api.browser-use.com/api/v3
+ *   - Auth header: X-Browser-Use-API-Key  (NOT Authorization: Bearer)
+ *   - Create task: POST /api/v3/sessions  body: { task, model? }
+ *   - List sessions: GET /api/v3/sessions?limit=N
  *
  * SAFETY:
- * - Only triggers after Philippe approves from the dashboard
- * - Gracefully handles 0 credits with a dashboard-visible error
- * - Uses v3 (most human-like, randomized waits built in)
- * - Max 5 job applications per session
- *
- * IMPORTANT: Philippe's LinkedIn account is his primary professional asset.
- * A ban would be catastrophic. All operations use anti-detection measures.
+ *   - Only triggers after Philippe approves from the dashboard
+ *   - Max 5 applications per session, 30-90s randomized waits between
+ *   - Browser Use's models add their own anti-detection
  */
 
-interface BrowserUseTask {
+const BU_BASE = 'https://api.browser-use.com/api/v3';
+const BU_HEADER = 'X-Browser-Use-API-Key';
+
+export interface BrowserUseTask {
   jobUrl: string;
   jobTitle: string;
   company: string;
   coverLetter: string | null;
 }
 
-interface BrowserUseResult {
+export interface BrowserUseResult {
   taskId: string;
-  status: 'completed' | 'failed' | 'no_credits' | 'queued';
+  status: 'completed' | 'failed' | 'no_credits' | 'queued' | 'unauthorized';
   message: string;
   jobUrl: string;
 }
 
-interface EasyApplyResult {
+export interface EasyApplyResult {
   results: BrowserUseResult[];
   durationMs: number;
   error: string | null;
-  hasCredits: boolean;
+  authOk: boolean;
 }
 
-/**
- * Check if Browser Use Cloud has available credits.
- * Returns false if the API key is missing or credits are exhausted.
- */
-async function checkCredits(apiKey: string): Promise<boolean> {
+/** Verify the API key works. Cheap GET — returns true on 2xx. */
+export async function verifyAuth(apiKey: string): Promise<{ ok: boolean; status: number; detail?: string }> {
   try {
-    const response = await fetch('https://api.browser-use.com/api/v1/credits', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
+    const r = await fetch(`${BU_BASE}/sessions?limit=1`, {
+      headers: { [BU_HEADER]: apiKey },
     });
-
-    if (!response.ok) return false;
-
-    const data = await response.json();
-    return (data.remaining_credits || 0) > 0;
-  } catch {
-    return false;
+    if (r.ok) return { ok: true, status: r.status };
+    const detail = (await r.text()).slice(0, 200);
+    return { ok: false, status: r.status, detail };
+  } catch (err) {
+    return { ok: false, status: 0, detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
-/**
- * Submit an Easy Apply task to Browser Use Cloud v3.
- * The task navigates to the LinkedIn job posting and fills out the Easy Apply form.
- */
-async function submitEasyApply(
-  apiKey: string,
-  task: BrowserUseTask
-): Promise<BrowserUseResult> {
-  const instructions = `
-Navigate to ${task.jobUrl}
-Wait 2-4 seconds (randomized)
-Click the "Easy Apply" button
-Wait for the application form to load
-Fill in any required fields using this information:
-- Name: Philippe Küng
-- Email: philippe.kung@clinicofai.com
-- Phone: +351 XXX XXX XXX
-- Location: Lisbon, Portugal
-- Current title: Head of AI / Founder
-${task.coverLetter ? `- Cover letter: ${task.coverLetter.slice(0, 500)}` : ''}
-Submit the application
-Wait for confirmation
-`.trim();
+/** Submit one Easy Apply task. POST /api/v3/sessions. */
+async function submitEasyApply(apiKey: string, task: BrowserUseTask): Promise<BrowserUseResult> {
+  const instructions = [
+    `Navigate to ${task.jobUrl}`,
+    'Wait 2-4 seconds (randomized).',
+    'Click the "Easy Apply" button.',
+    'Wait for the application form to load.',
+    'Fill in fields with: Name "Philippe Küng", Email "philippe.kung@clinicofai.com", Location "Lisbon, Portugal".',
+    task.coverLetter ? `Cover letter: ${task.coverLetter.slice(0, 800)}` : '',
+    'Submit and wait for confirmation. If a multi-step form, fill what you can; do not invent answers.',
+    'On success, return the confirmation message verbatim.',
+  ].filter(Boolean).join('\n');
 
   try {
-    const response = await fetch('https://api.browser-use.com/api/v1/run-task', {
+    const r = await fetch(`${BU_BASE}/sessions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        [BU_HEADER]: apiKey,
       },
       body: JSON.stringify({
         task: instructions,
-        save_browser_data: true,
+        title: `Easy Apply · ${task.company}`,
       }),
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      return {
-        taskId: '',
-        status: 'failed',
-        message: `API error: ${response.status} ${error.slice(0, 200)}`,
-        jobUrl: task.jobUrl,
-      };
+    if (r.status === 401 || r.status === 403) {
+      return { taskId: '', status: 'unauthorized', message: 'Browser Use API key rejected', jobUrl: task.jobUrl };
     }
-
-    const data = await response.json();
+    if (r.status === 402 || r.status === 429) {
+      const detail = (await r.text()).slice(0, 200);
+      return { taskId: '', status: 'no_credits', message: `Browser Use throttled / out of credits: ${detail}`, jobUrl: task.jobUrl };
+    }
+    if (!r.ok) {
+      const detail = (await r.text()).slice(0, 300);
+      return { taskId: '', status: 'failed', message: `${r.status}: ${detail}`, jobUrl: task.jobUrl };
+    }
+    const data = await r.json();
     return {
-      taskId: data.id || data.task_id || '',
+      taskId: String(data.id ?? data.session_id ?? ''),
       status: 'queued',
       message: `Easy Apply queued for ${task.company} — ${task.jobTitle}`,
       jobUrl: task.jobUrl,
     };
   } catch (err) {
-    return {
-      taskId: '',
-      status: 'failed',
-      message: err instanceof Error ? err.message : String(err),
-      jobUrl: task.jobUrl,
-    };
+    return { taskId: '', status: 'failed', message: err instanceof Error ? err.message : String(err), jobUrl: task.jobUrl };
   }
 }
 
 /**
- * Main export: Execute Easy Apply for approved jobs.
- * Called from the /api/actions/apply route after Philippe approves.
- *
- * Returns immediately with no_credits status if Browser Use has 0 credits,
- * so the dashboard can show an alert instead of silently failing.
+ * Execute Easy Apply for approved jobs. Called by /api/actions/apply after approval.
+ * Verifies auth once up-front, then submits up to 5 tasks with randomized waits.
  */
-export async function executeEasyApply(
-  tasks: BrowserUseTask[]
-): Promise<EasyApplyResult> {
+export async function executeEasyApply(tasks: BrowserUseTask[]): Promise<EasyApplyResult> {
   const apiKey = process.env.BROWSER_USE_API_KEY;
-
   if (!apiKey) {
     return {
       results: tasks.map((t) => ({
-        taskId: '',
-        status: 'no_credits' as const,
-        message: 'BROWSER_USE_API_KEY not configured',
-        jobUrl: t.jobUrl,
+        taskId: '', status: 'unauthorized' as const,
+        message: 'BROWSER_USE_API_KEY not configured', jobUrl: t.jobUrl,
       })),
       durationMs: 0,
       error: 'BROWSER_USE_API_KEY not set',
-      hasCredits: false,
+      authOk: false,
     };
   }
 
   const startTime = Date.now();
-
-  // Check credits first
-  const hasCredits = await checkCredits(apiKey);
-  if (!hasCredits) {
+  const auth = await verifyAuth(apiKey);
+  if (!auth.ok) {
     return {
       results: tasks.map((t) => ({
-        taskId: '',
-        status: 'no_credits' as const,
-        message: 'Browser Use Cloud has 0 credits. Add credits at cloud.browser-use.com to enable Easy Apply.',
+        taskId: '', status: 'unauthorized' as const,
+        message: `Browser Use auth failed (${auth.status}): ${auth.detail ?? ''}`,
         jobUrl: t.jobUrl,
       })),
       durationMs: Date.now() - startTime,
-      error: 'No Browser Use Cloud credits available',
-      hasCredits: false,
+      error: `Auth ${auth.status}: ${auth.detail ?? ''}`,
+      authOk: false,
     };
   }
 
-  // Max 5 applications per session (anti-detection)
-  const limitedTasks = tasks.slice(0, 5);
+  const limited = tasks.slice(0, 5);
   const results: BrowserUseResult[] = [];
-
-  for (const task of limitedTasks) {
-    const result = await submitEasyApply(apiKey, task);
-    results.push(result);
-
-    // Randomized wait between applications (30-90 seconds)
-    if (limitedTasks.indexOf(task) < limitedTasks.length - 1) {
-      const waitMs = 30000 + Math.random() * 60000;
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
+  for (let i = 0; i < limited.length; i++) {
+    results.push(await submitEasyApply(apiKey, limited[i]));
+    if (i < limited.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 30000 + Math.random() * 60000));
     }
   }
 
@@ -181,8 +146,6 @@ export async function executeEasyApply(
     results,
     durationMs: Date.now() - startTime,
     error: null,
-    hasCredits: true,
+    authOk: true,
   };
 }
-
-export type { BrowserUseTask, BrowserUseResult, EasyApplyResult };

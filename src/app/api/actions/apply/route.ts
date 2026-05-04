@@ -102,10 +102,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      hasCredits: result.hasCredits,
+      authOk: result.authOk,
       applied: result.results.filter((r) => r.status === 'completed' || r.status === 'queued').length,
       failed: result.results.filter((r) => r.status === 'failed').length,
       noCredits: result.results.filter((r) => r.status === 'no_credits').length,
+      unauthorized: result.results.filter((r) => r.status === 'unauthorized').length,
       results: result.results,
     });
   } catch (err) {
