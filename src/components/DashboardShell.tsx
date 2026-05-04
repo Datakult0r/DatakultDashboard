@@ -367,39 +367,37 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   return (
     <div className="min-h-screen flex flex-col relative z-10">
       {/* Header */}
-      <header className="glass border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] tracking-[0.25em] uppercase text-tertiary font-mono">
-                01 — Clinic of AI
-              </p>
-              <h1 className="text-2xl sm:text-3xl font-semibold text-primary mt-1 tracking-tight">
-                Control Tower
-              </h1>
+      <header className="glass header-accent sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            {/* Brand */}
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
+                <Zap size={16} className="text-accent" />
+              </div>
+              <div>
+                <p className="text-[9px] tracking-[0.3em] uppercase text-tertiary font-mono leading-none">
+                  Clinic of AI
+                </p>
+                <h1 className="text-lg sm:text-xl font-semibold text-primary tracking-tight leading-tight">
+                  Control Tower
+                </h1>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Center controls */}
+            <div className="hidden md:flex items-center gap-2">
               <RunwayWidget />
 
-              <button
-                onClick={() => setPaletteOpen(true)}
-                title="Command palette (Cmd/Ctrl+K)"
-                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-mono text-tertiary bg-elevated/40 border border-border rounded-md hover:text-accent hover:border-accent/50 transition-colors"
-              >
-                <Command size={11} />
-                <span>K</span>
-              </button>
-
-              <div className="hidden md:flex items-center gap-0.5 bg-elevated/40 border border-border rounded-md p-0.5">
+              <div className="flex items-center gap-0.5 bg-elevated/50 border border-border rounded-lg p-0.5">
                 {scopeOptions.map((opt) => (
                   <button
                     key={opt.id}
                     onClick={() => setDateScope(opt.id)}
                     aria-pressed={dateScope === opt.id}
-                    className={`px-2 py-1 text-[11px] font-mono uppercase tracking-wider rounded transition-colors ${
+                    className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
                       dateScope === opt.id
-                        ? 'bg-accent/20 text-accent'
+                        ? 'bg-accent/15 text-accent shadow-sm shadow-accent/10'
                         : 'text-tertiary hover:text-secondary hover:bg-elevated'
                     }`}
                   >
@@ -407,25 +405,40 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
                   </button>
                 ))}
               </div>
+            </div>
 
-              <div className="hidden sm:flex items-center gap-1.5">
+            {/* Right actions */}
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1">
                 <a href="https://www.linkedin.com/messaging/" target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-info/10 text-info hover:bg-info/20 border border-info/20">
-                  <Globe size={13} /> DMs
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-info/8 text-info/70 hover:text-info hover:bg-info/15 border border-info/10 transition-all"
+                  title="LinkedIn DMs">
+                  <Globe size={14} />
                 </a>
                 <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-elevated text-secondary hover:text-primary border border-border">
-                  <CalendarDays size={13} /> Cal
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-elevated/50 text-secondary/70 hover:text-primary hover:bg-elevated border border-border/50 transition-all"
+                  title="Google Calendar">
+                  <CalendarDays size={14} />
                 </a>
                 <a href="https://cal.read.ai/philippe-datakult/30-min" target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20">
-                  <Link2 size={13} /> Book
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-accent/8 text-accent/70 hover:text-accent hover:bg-accent/15 border border-accent/10 transition-all"
+                  title="Booking link">
+                  <Link2 size={14} />
                 </a>
               </div>
 
-              <div className="text-right ml-2">
-                <p className="text-[11px] text-tertiary font-mono">{format(now, 'EEE')}</p>
-                <p className="text-sm text-primary font-semibold">{format(now, 'MMM d')}</p>
+              <button
+                onClick={() => setPaletteOpen(true)}
+                title="Command palette (Cmd/Ctrl+K)"
+                className="hidden md:flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-mono text-tertiary bg-elevated/30 border border-border/50 rounded-lg hover:text-accent hover:border-accent/30 transition-all"
+              >
+                <Command size={10} />
+                <span>K</span>
+              </button>
+
+              <div className="text-right ml-1">
+                <p className="text-[10px] text-tertiary font-mono leading-none">{format(now, 'EEE')}</p>
+                <p className="text-sm text-primary font-semibold leading-tight mt-0.5">{format(now, 'MMM d')}</p>
               </div>
             </div>
           </div>
@@ -433,28 +446,32 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       </header>
 
       {/* Surface tabs */}
-      <div className="glass border-b sticky top-[73px] sm:top-[81px] z-30">
+      <div className="glass sticky top-[57px] sm:top-[65px] z-30 border-b border-border/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-0.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             {surfaces.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setActiveSurface(s.id)}
-                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
+                className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap transition-all ${
                   activeSurface === s.id
-                    ? 'border-accent text-accent'
-                    : 'border-transparent text-secondary hover:text-primary'
+                    ? 'text-accent'
+                    : 'text-secondary/70 hover:text-primary'
                 } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
               >
-                {s.icon}
+                <span className={`transition-colors ${activeSurface === s.id ? 'text-accent' : ''}`}>{s.icon}</span>
                 <span>{s.label}</span>
                 {typeof s.badge === 'number' && s.badge > 0 && (
-                  <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-mono font-semibold ${
+                  <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-mono font-bold ${
                     s.pulse ? 'bg-danger/20 text-danger animate-pulse-glow' :
-                    activeSurface === s.id ? 'bg-accent/15 text-accent' : 'bg-elevated text-tertiary'
+                    activeSurface === s.id ? 'bg-accent/15 text-accent' : 'bg-elevated/80 text-tertiary'
                   }`}>
                     {s.badge}
                   </span>
+                )}
+                {/* Active indicator — glowing bottom bar */}
+                {activeSurface === s.id && (
+                  <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-accent shadow-[0_0_8px_rgba(125,211,160,0.4)]" />
                 )}
               </button>
             ))}

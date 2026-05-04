@@ -248,6 +248,13 @@ export default function SystemHealthPanel() {
               <CheckCircle2 size={12} />
               Run approved
             </button>
+            <a
+              href="/auth/gmail"
+              className="text-xs px-2 py-1 rounded bg-warning/10 text-warning hover:bg-warning/20 border border-warning/30 transition-colors inline-flex items-center gap-1.5"
+              title="Re-authorize Gmail + Calendar OAuth (when invalid_grant)"
+            >
+              Re-auth Gmail
+            </a>
             <button
               onClick={() => setRefreshKey((k) => k + 1)}
               disabled={loading}
