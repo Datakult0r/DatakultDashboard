@@ -11,13 +11,12 @@ import {
   Clock,
   RefreshCw,
   Play,
-  Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SystemHealthRow } from '@/types/triage';
 import { useToast } from './Toast';
 
-interface AnthropicTest {
+interface VendorTest {
   status: 'ok' | 'no_credits' | 'invalid_key' | 'rate_limited' | 'network_error' | 'unknown';
   message?: string;
   keyMasked?: string;
@@ -38,8 +37,10 @@ export default function SystemHealthPanel() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [running, setRunning] = useState(false);
-  const [anthropic, setAnthropic] = useState<AnthropicTest | null>(null);
+  const [anthropic, setAnthropic] = useState<VendorTest | null>(null);
+  const [browserUse, setBrowserUse] = useState<VendorTest | null>(null);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
+  const [testingBrowserUse, setTestingBrowserUse] = useState(false);
   const toast = useToast();
 
   const testAnthropic = async () => {
@@ -47,7 +48,7 @@ export default function SystemHealthPanel() {
     try {
       const r = await fetch('/api/anthropic/test', { cache: 'no-store' });
       const data = await r.json();
-      setAnthropic(data as AnthropicTest);
+      setAnthropic(data as VendorTest);
       if (data.status === 'ok') {
         toast.push('success', 'Anthropic API working — credits available');
       } else if (data.status === 'no_credits') {
@@ -63,9 +64,21 @@ export default function SystemHealthPanel() {
     }
   };
 
-  // Auto-test once on mount so the user sees the state without clicking
+  const testBrowserUse = async () => {
+    setTestingBrowserUse(true);
+    try {
+      const r = await fetch('/api/browser-use/test', { cache: 'no-store' });
+      const data = await r.json();
+      setBrowserUse(data as VendorTest);
+    } finally {
+      setTestingBrowserUse(false);
+    }
+  };
+
+  // Auto-test both on mount so user sees state without clicking
   useEffect(() => {
     testAnthropic();
+    testBrowserUse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,50 +190,25 @@ export default function SystemHealthPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Anthropic API credit status — first because it gates briefing + cron scoring */}
-      {anthropic && (
-        <div className={`bg-surface border rounded-lg p-3 flex items-center gap-3 ${
-          anthropic.status === 'ok' ? 'border-success/30' :
-          anthropic.status === 'no_credits' ? 'border-danger/40' :
-          'border-warning/30'
-        }`}>
-          <Sparkles size={14} className={
-            anthropic.status === 'ok' ? 'text-success' :
-            anthropic.status === 'no_credits' ? 'text-danger' :
-            'text-warning'
-          } />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-primary flex items-center gap-2">
-              Anthropic API
-              <span className={`text-[10px] font-mono uppercase ${
-                anthropic.status === 'ok' ? 'text-success' :
-                anthropic.status === 'no_credits' ? 'text-danger' :
-                'text-warning'
-              }`}>
-                {anthropic.status}
-              </span>
-            </div>
-            <div className="text-[11px] text-tertiary font-mono mt-0.5">
-              {anthropic.keyMasked ? `key ${anthropic.keyMasked} (${anthropic.keyLength} chars)` : 'no key info'}
-              {anthropic.httpStatus ? ` · HTTP ${anthropic.httpStatus}` : ''}
-            </div>
-            {anthropic.status === 'no_credits' && (
-              <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer"
-                className="text-[11px] text-danger underline underline-offset-2 hover:no-underline">
-                Open billing →
-              </a>
-            )}
-          </div>
-          <button
-            onClick={testAnthropic}
-            disabled={testingAnthropic}
-            className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary disabled:opacity-50 inline-flex items-center gap-1.5"
-          >
-            <RefreshCw size={11} className={testingAnthropic ? 'animate-spin' : ''} />
-            Re-test
-          </button>
-        </div>
-      )}
+      {/* Vendor API credentials — gates briefing, scoring, Easy Apply */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <VendorCard
+          label="Anthropic API"
+          help="Powers briefing + cron scoring + CV tailoring"
+          billingUrl="https://console.anthropic.com/settings/billing"
+          test={anthropic}
+          testing={testingAnthropic}
+          onRetest={testAnthropic}
+        />
+        <VendorCard
+          label="Browser Use Cloud"
+          help="Powers approved Easy Apply submissions"
+          billingUrl="https://cloud.browser-use.com"
+          test={browserUse}
+          testing={testingBrowserUse}
+          onRetest={testBrowserUse}
+        />
+      </div>
 
       {/* Header card — overall pipeline health at a glance */}
       <div className="bg-surface border border-border rounded-lg p-4">
@@ -336,6 +324,63 @@ function HealthStat({ label, count, icon, color }: HealthStatProps) {
         <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
       </div>
       <p className="text-lg font-mono font-semibold mt-0.5">{count}</p>
+    </div>
+  );
+}
+
+interface VendorCardProps {
+  label: string;
+  help: string;
+  billingUrl: string;
+  test: VendorTest | null;
+  testing: boolean;
+  onRetest: () => void;
+}
+
+/** Vendor API credential status card — used for Anthropic + Browser Use. */
+function VendorCard({ label, help, billingUrl, test, testing, onRetest }: VendorCardProps) {
+  const status = test?.status ?? 'unknown';
+  const tone =
+    status === 'ok'
+      ? { border: 'border-success/30', text: 'text-success', dot: 'bg-success' }
+      : status === 'no_credits'
+        ? { border: 'border-danger/40', text: 'text-danger', dot: 'bg-danger' }
+        : status === 'invalid_key'
+          ? { border: 'border-warning/40', text: 'text-warning', dot: 'bg-warning' }
+          : { border: 'border-border', text: 'text-tertiary', dot: 'bg-tertiary' };
+
+  return (
+    <div className={`bg-surface border rounded-lg p-3 ${tone.border}`}>
+      <div className="flex items-start gap-2">
+        <span className={`block w-1.5 h-1.5 rounded-full mt-2 ${tone.dot} flex-shrink-0`} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-primary flex items-center gap-2">
+            {label}
+            <span className={`text-[10px] font-mono uppercase ${tone.text}`}>{status}</span>
+          </div>
+          <div className="text-[11px] text-tertiary mt-0.5">{help}</div>
+          {test && (
+            <div className="text-[11px] text-tertiary font-mono mt-0.5 truncate">
+              {test.keyMasked ? `key ${test.keyMasked} (${test.keyLength} chars)` : 'no key info'}
+              {test.httpStatus ? ` · HTTP ${test.httpStatus}` : ''}
+            </div>
+          )}
+          {(status === 'no_credits' || status === 'invalid_key') && (
+            <a href={billingUrl} target="_blank" rel="noopener noreferrer"
+              className={`text-[11px] underline underline-offset-2 hover:no-underline ${tone.text}`}>
+              Open billing →
+            </a>
+          )}
+        </div>
+        <button
+          onClick={onRetest}
+          disabled={testing}
+          className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary disabled:opacity-50 inline-flex items-center gap-1 flex-shrink-0"
+        >
+          <RefreshCw size={11} className={testing ? 'animate-spin' : ''} />
+          Re-test
+        </button>
+      </div>
     </div>
   );
 }

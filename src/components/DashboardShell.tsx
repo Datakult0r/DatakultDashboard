@@ -15,7 +15,6 @@ import SystemHealthPanel from './SystemHealthPanel';
 import RunwayWidget from './RunwayWidget';
 import ChatWidget from './ChatWidget';
 import ErrorBoundary from './ErrorBoundary';
-import SystemAlert from './SystemAlert';
 import CommandPalette, { PaletteIcons, type PaletteCommand } from './CommandPalette';
 import ShortcutHelpModal from './ShortcutHelpModal';
 import { useToast } from './Toast';
@@ -465,17 +464,6 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
 
       {/* Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {items.some((i) => i.notes?.includes('0 credits') || i.notes?.includes('no_credits') || i.notes?.includes('No Browser Use')) && (
-          <div className="mb-4">
-            <SystemAlert
-              type="warning"
-              message="Browser Use Cloud has 0 credits. Easy Apply is disabled until credits are added."
-              actionUrl="https://cloud.browser-use.com"
-              actionLabel="Add Credits"
-            />
-          </div>
-        )}
-
         <ErrorBoundary label={activeSurface}>
           <div key={activeSurface} className="animate-tab-enter">
             {renderSurface()}
