@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { GET as collectHandler } from '../collect/route';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -7,10 +8,11 @@ export const maxDuration = 300;
 /**
  * POST /api/triage/run
  *
- * Server-side proxy — calls /api/triage/collect with the CRON_SECRET injected.
- * Lets the dashboard trigger a manual cron run without exposing the secret to
- * the client. Personal tool, so we accept the unauthenticated trigger surface
- * (cost is bounded to ~$0.10 per run; not worth the auth complexity yet).
+ * In-process invocation of the cron handler with CRON_SECRET injected as Bearer.
+ * Avoids HTTP round-trip (which would hit Vercel team SSO on the *.vercel.app URL).
+ *
+ * Personal tool, single user — we accept the unauthenticated trigger surface
+ * because the cost is bounded (~$0.10 per run).
  */
 export async function POST() {
   const secret = process.env.CRON_SECRET;
@@ -18,16 +20,20 @@ export async function POST() {
     return NextResponse.json({ error: 'CRON_SECRET not set' }, { status: 500 });
   }
 
-  // Resolve absolute base URL — Vercel sets VERCEL_URL on serverless
-  const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+  // Build a synthetic NextRequest with the Authorization header collect/route.ts expects
+  const fakeReq = new NextRequest(new URL('http://localhost/api/triage/collect'), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${secret}` },
+  });
 
   try {
-    const r = await fetch(`${host}/api/triage/collect`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${secret}` },
+    const response = await collectHandler(fakeReq);
+    const data = await response.json();
+    return NextResponse.json({
+      ok: response.ok,
+      status: response.status,
+      result: data,
     });
-    const data = await r.json();
-    return NextResponse.json({ ok: r.ok, status: r.status, result: data });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

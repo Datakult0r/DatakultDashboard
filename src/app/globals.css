@@ -122,8 +122,168 @@ button, a, input, select, textarea {
 .stagger-4 { animation-delay: 0.20s; }
 .stagger-5 { animation-delay: 0.25s; }
 
-/* Hero card — used by NowSurface */
+/* Hero card — dramatic gradient with animated glow border */
 .hero-card {
-  background: linear-gradient(135deg, rgba(125, 211, 160, 0.05) 0%, rgba(20, 24, 26, 0.95) 50%);
-  border: 1px solid rgba(125, 211, 160, 0.25);
+  background: linear-gradient(135deg, rgba(125, 211, 160, 0.08) 0%, rgba(20, 24, 26, 0.98) 40%, rgba(20, 24, 26, 0.95) 100%);
+  border: 1px solid rgba(125, 211, 160, 0.3);
+  box-shadow:
+    0 0 30px -10px rgba(125, 211, 160, 0.1),
+    inset 0 1px 0 rgba(125, 211, 160, 0.08);
+  position: relative;
+  overflow: hidden;
 }
+.hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  opacity: 0.6;
+}
+
+/* Header accent line */
+.header-accent {
+  position: relative;
+}
+.header-accent::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-accent) 20%, var(--color-money) 80%, transparent);
+  opacity: 0.3;
+}
+
+/* Surface card — elevated card with subtle left accent */
+.surface-card {
+  position: relative;
+  border-left: 2px solid transparent;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.surface-card:hover {
+  border-left-color: var(--color-accent);
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Stage-colored accents for kanban */
+.stage-lead      { border-top: 2px solid var(--color-info); }
+.stage-discovery { border-top: 2px solid var(--color-accent); }
+.stage-proposal  { border-top: 2px solid var(--color-money); }
+.stage-won       { border-top: 2px solid var(--color-success); }
+.stage-lost      { border-top: 2px solid var(--color-danger); }
+.stage-paused    { border-top: 2px solid var(--color-secondary); }
+
+/* Glow button — primary CTA */
+.glow-btn {
+  position: relative;
+  box-shadow: 0 0 20px -5px rgba(125, 211, 160, 0.3);
+  transition: all 0.2s ease;
+}
+.glow-btn:hover {
+  box-shadow: 0 0 30px -5px rgba(125, 211, 160, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Stat glow — animated background pulse for stats */
+@keyframes statPulse {
+  0%, 100% { opacity: 0.04; }
+  50%      { opacity: 0.08; }
+}
+.stat-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at top right, currentColor, transparent 70%);
+  animation: statPulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Vendor status dot — animated pulse for errors */
+@keyframes statusPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.6; }
+}
+.status-dot-error {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* Animated gradient border (for premium panels) */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.gradient-border {
+  position: relative;
+  isolation: isolate;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-money), var(--color-info), var(--color-accent));
+  background-size: 300% 300%;
+  animation: gradientShift 8s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: -1;
+  opacity: 0.5;
+}
+
+/* Count-up number animation */
+@keyframes countFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-animate {
+  animation: countFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Smooth tab content transitions */
+@keyframes surfaceEnter {
+  from { opacity: 0; transform: translateY(12px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-surface-enter {
+  animation: surfaceEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Badge bounce on update */
+@keyframes badgeBounce {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+.badge-bounce {
+  animation: badgeBounce 0.3s ease;
+}
+
+/* Progress bar fill with gradient */
+.progress-fill {
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-bright));
+  animation: fillBar 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Glass variant — slightly more opaque for overlays */
+.glass-heavy {
+  background: rgba(11, 13, 14, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(58, 66, 72, 0.5);
+}
+
+/* Stagger extensions for larger lists */
+.stagger-6  { animation-delay: 0.30s; }
+.stagger-7  { animation-delay: 0.35s; }
+.stagger-8  { animation-delay: 0.40s; }
+.stagger-9  { animation-delay: 0.45s; }
+.stagger-10 { animation-delay: 0.50s; }

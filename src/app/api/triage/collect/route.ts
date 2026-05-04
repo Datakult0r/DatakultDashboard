@@ -433,9 +433,20 @@ export async function GET(request: NextRequest) {
       const firecrawlResult = await scrapeIntelligence();
       results.firecrawlNews.scraped = firecrawlResult.news.length;
 
-      await logHealth(runId, 'firecrawl', 'scrape_news',
-        firecrawlResult.error ? (firecrawlResult.news.length > 0 ? 'ok' : 'error') : 'ok',
-        firecrawlResult.news.length, firecrawlResult.durationMs, firecrawlResult.error || undefined);
+      // Treat 402 (insufficient credits) as a skipped status, not error — Perplexity
+      // covers the same domain and Firecrawl is a deliberate fallback only.
+      const isCreditExhaustion =
+        firecrawlResult.error?.includes('402') ||
+        firecrawlResult.error?.includes('Insufficient credits');
+      const status = isCreditExhaustion
+        ? 'skipped'
+        : firecrawlResult.error
+          ? firecrawlResult.news.length > 0 ? 'ok' : 'error'
+          : 'ok';
+      const fallback = isCreditExhaustion ? 'firecrawl_no_credits' : undefined;
+      await logHealth(runId, 'firecrawl', 'scrape_news', status,
+        firecrawlResult.news.length, firecrawlResult.durationMs,
+        firecrawlResult.error || undefined, fallback);
 
       // Only insert Firecrawl news if Perplexity didn't already cover it
       if (firecrawlResult.news.length > 0 && results.perplexityNews.inserted === 0) {
