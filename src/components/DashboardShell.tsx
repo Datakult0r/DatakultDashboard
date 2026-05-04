@@ -20,7 +20,7 @@ import ShortcutHelpModal from './ShortcutHelpModal';
 import { useToast } from './Toast';
 import type { CustomerEngagement } from '@/types/triage';
 
-type Surface = 'now' | 'pipeline' | 'intake' | 'health';
+type Surface = 'now' | 'pipeline' | 'intake';
 type DateScope = 'today' | '24h' | 'week' | 'all';
 
 interface DashboardShellProps {
@@ -45,6 +45,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   const [now, setNow] = useState(new Date());
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [healthOpen, setHealthOpen] = useState(false);
   const toast = useToast();
 
   // Load engagements once for palette search
@@ -99,8 +100,10 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
-      if (detail === 'now' || detail === 'pipeline' || detail === 'intake' || detail === 'health') {
+      if (detail === 'now' || detail === 'pipeline' || detail === 'intake') {
         setActiveSurface(detail);
+      } else if (detail === 'health') {
+        setHealthOpen(true);
       }
     };
     window.addEventListener('control-tower:goto', handler);
@@ -132,7 +135,11 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       if (paletteOpen) return; // palette handles its own keys
       if (isTyping(e.target)) return;
 
-      if (e.key === '?') {
+      if (e.key === 'Escape') {
+        if (healthOpen) { setHealthOpen(false); e.preventDefault(); return; }
+        if (helpOpen) { setHelpOpen(false); e.preventDefault(); return; }
+      }
+            if (e.key === '?') {
         e.preventDefault();
         setHelpOpen(true);
         return;
@@ -148,14 +155,14 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         if (k === 'n') { setActiveSurface('now'); cancelGo(); e.preventDefault(); return; }
         if (k === 'p') { setActiveSurface('pipeline'); cancelGo(); e.preventDefault(); return; }
         if (k === 'i') { setActiveSurface('intake'); cancelGo(); e.preventDefault(); return; }
-        if (k === 'h') { setActiveSurface('health'); cancelGo(); e.preventDefault(); return; }
+        if (k === 'h') { setHealthOpen(true); cancelGo(); e.preventDefault(); return; }
         cancelGo();
         return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [paletteOpen, toast]);
+  }, [paletteOpen, toast, healthOpen, helpOpen]);
 
   // Realtime: triage_items
   useEffect(() => {
@@ -290,7 +297,6 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     { id: 'now', label: 'Now', icon: <Zap size={16} />, badge: intakeBadge, pulse: missedPendingCount > 0 },
     { id: 'pipeline', label: 'Pipeline', icon: <Target size={16} />, badge: applications.filter((a) => !['rejected','ghosted','withdrawn'].includes(a.status)).length },
     { id: 'intake', label: 'Intake', icon: <Inbox size={16} />, badge: items.length },
-    { id: 'health', label: 'Health', icon: <HeartPulse size={16} /> },
   ];
 
   const scopeOptions: { id: DateScope; label: string }[] = [
@@ -306,7 +312,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       { id: 'go-now',      group: 'Navigate', label: 'Go to Now',      hint: 'g n', icon: PaletteIcons.Now,      run: () => setActiveSurface('now') },
       { id: 'go-pipeline', group: 'Navigate', label: 'Go to Pipeline', hint: 'g p', icon: PaletteIcons.Pipeline, run: () => setActiveSurface('pipeline') },
       { id: 'go-intake',   group: 'Navigate', label: 'Go to Intake',   hint: 'g i', icon: PaletteIcons.Intake,   run: () => setActiveSurface('intake') },
-      { id: 'go-health',   group: 'Navigate', label: 'Go to Health',   hint: 'g h', icon: PaletteIcons.Health,   run: () => setActiveSurface('health') },
+      { id: 'go-health',   group: 'Navigate', label: 'Open Health drawer', hint: 'g h', icon: PaletteIcons.Health, run: () => setHealthOpen(true) },
       { id: 'log-outbound', group: 'Action', label: 'Log a prospect touch', icon: PaletteIcons.Outbound,
         run: () => { setActiveSurface('now'); toast.push('info', 'Use the Outbound counter on Now to log it.'); }
       },
@@ -359,8 +365,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         );
       case 'intake':
         return <IntakeSurface items={items} onApprove={handleApprove} onReject={handleReject} />;
-      case 'health':
-        return <SystemHealthPanel />;
+      // health is now a drawer (right side), opened from header / Cmd+K / g h
     }
   };
 
@@ -434,6 +439,14 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
               >
                 <Command size={10} />
                 <span>K</span>
+              </button>
+
+              <button
+                onClick={() => setHealthOpen(true)}
+                title="System Health (g h)"
+                className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-lg bg-success/8 text-success/70 hover:text-success hover:bg-success/15 border border-success/10 transition-all"
+              >
+                <HeartPulse size={14} />
               </button>
 
               <div className="text-right ml-1">
@@ -526,6 +539,37 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       >
         <Command size={18} />
       </button>
+
+      {/* Health drawer — slide in from the right, closes on backdrop click or Esc */}
+      {healthOpen && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end animate-fade-in"
+          onClick={() => setHealthOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative h-full w-full max-w-2xl bg-surface border-l border-border/40 shadow-2xl overflow-y-auto animate-slide-in-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 glass-heavy border-b border-border/30 px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HeartPulse size={16} className="text-success" />
+                <h2 className="text-sm font-semibold text-primary">System Health</h2>
+                <span className="text-[10px] font-mono text-tertiary uppercase tracking-wider">drawer · g h</span>
+              </div>
+              <button
+                onClick={() => setHealthOpen(false)}
+                className="px-2 py-1 text-xs text-tertiary hover:text-primary hover:bg-elevated rounded-md transition-colors"
+              >
+                Close (Esc)
+              </button>
+            </div>
+            <div className="p-5">
+              <SystemHealthPanel />
+            </div>
+          </div>
+        </div>
+      )}
 
       <ChatWidget items={items} applications={applications} stats={stats} />
     </div>

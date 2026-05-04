@@ -25,6 +25,8 @@ export default function SourceTag({ source, sourceType }: SourceTagProps) {
     whatsapp: { bg: 'bg-success/10', text: 'text-success' },
     calendar: { bg: 'bg-orange-700/10', text: 'text-orange-700' },
     system: { bg: 'bg-gray-300/40', text: 'text-gray-500' },
+    remoteok: { bg: 'bg-warning/15', text: 'text-warning' },
+    wttj: { bg: 'bg-success/10', text: 'text-success' },
     other: { bg: 'bg-gray-300/40', text: 'text-secondary' },
   };
 

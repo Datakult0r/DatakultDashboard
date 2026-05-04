@@ -4,6 +4,7 @@ import { fetchUnreadEmails } from '@/lib/gmail';
 import { scoreEmails } from '@/lib/scoring';
 import { fetchCalendarEvents } from '@/lib/calendar';
 import { discoverJobs } from '@/lib/apify';
+import { discoverJobsRemoteOK } from '@/lib/remoteok';
 import { scoreJobs } from '@/lib/job-scoring';
 import { tailorCVForJobs } from '@/lib/cv-tailor';
 import { scrapeIntelligence, scrapeCareerPage } from '@/lib/firecrawl';
@@ -236,6 +237,23 @@ export async function GET(request: NextRequest) {
       await logHealth(runId, 'apify', 'discover_jobs', 'skipped', 0, 0, 'APIFY_API_TOKEN not set');
     } else {
       const apifyResult = await discoverJobs();
+
+      // RemoteOK — free public JSON feed, runs alongside Apify so we always have a
+      // non-LinkedIn fallback. Failures are silent (logged to system_health, never throw).
+      let remoteOkItems: typeof apifyResult.items = [];
+      try {
+        const ro = await discoverJobsRemoteOK();
+        remoteOkItems = ro.items;
+        await logHealth(runId, 'remoteok', 'discover_jobs', ro.error ? (ro.items.length > 0 ? 'ok' : 'error') : 'ok',
+          ro.items.length, ro.durationMs, ro.error || undefined);
+      } catch (roErr) {
+        const roMsg = roErr instanceof Error ? roErr.message : String(roErr);
+        await logHealth(runId, 'remoteok', 'discover_jobs', 'error', 0, 0, roMsg);
+      }
+      // Merge dedup-by-jobUrl
+      const seenUrls = new Set(apifyResult.items.map((j) => j.jobUrl));
+      for (const j of remoteOkItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
+
       results.jobs.discovered = apifyResult.items.length;
 
       if (apifyResult.error) {
@@ -262,7 +280,7 @@ export async function GET(request: NextRequest) {
           .map((s) => ({
             title: `${s.job.title} at ${s.job.company}`,
             subtitle: s.job.description.slice(0, 200),
-            source: s.job.source === 'linkedin' ? 'linkedin' : 'other',
+            source: (s.job.source === 'linkedin' || s.job.source === 'remoteok') ? s.job.source : 'other',
             category: 'job' as const,
             score: s.score,
             score_label: s.scoreLabel,

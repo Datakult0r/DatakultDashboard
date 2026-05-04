@@ -6,7 +6,7 @@
 export type TriageCategory = 'urgent' | 'review' | 'job' | 'news' | 'schedule' | 'done';
 export type TriageStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type ScoreLabel = 'strong' | 'apply' | 'light' | 'skip' | 'priority';
-export type SourceType = 'email' | 'gmail' | 'gmail_personal' | 'linkedin' | 'linkedin_dm' | 'beeper' | 'whatsapp' | 'calendar' | 'system' | 'other';
+export type SourceType = 'email' | 'gmail' | 'gmail_personal' | 'linkedin' | 'linkedin_dm' | 'beeper' | 'whatsapp' | 'calendar' | 'system' | 'remoteok' | 'wttj' | 'other';
 
 /** A2UI Action Types — what the agent prepared for Philippe to approve */
 export type ActionType =
@@ -287,4 +287,41 @@ export interface JobApplication {
   source_triage_id: string | null;
   score: number | null;
   score_label: ScoreLabel | null;
+}
+
+// ==================================================
+// PhilippeJob — persistent job tracker (philippe_jobs)
+// ==================================================
+export type PhilippeJobDecision = 'STRONG_APPLY' | 'APPLY' | 'LIGHT' | 'SKIP';
+export type PhilippeJobApplyStatus = 'SCORED' | 'QUEUED' | 'APPLYING' | 'APPLIED' | 'FAILED' | 'SKIPPED';
+export type PhilippeJobSource = 'linkedin' | 'remoteok' | 'wttj' | 'indeed' | 'jobup' | 'glassdoor';
+
+export interface PhilippeJob {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string;
+  company: string;
+  location: string | null;
+  work_mode: string | null;
+  seniority: string | null;
+  apply_type: string | null;
+  job_url: string | null;
+  description_text: string | null;
+  application_requirements: string | null;
+  source: PhilippeJobSource;
+  search_query: string | null;
+  search_location: string | null;
+  posted_text: string | null;
+  targeting_score: number | null;
+  targeting_checks: Record<string, unknown> | null;
+  score: number | null;
+  decision: PhilippeJobDecision | null;
+  cover_note: string | null;
+  screening_answers: Record<string, unknown> | null;
+  apply_status: PhilippeJobApplyStatus | null;
+  apply_reason: string | null;
+  browser_use_session_id: string | null;
+  browser_use_workspace_id: string | null;
+  raw_evaluation: string | null;
 }

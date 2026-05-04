@@ -22,6 +22,8 @@ const sourceIcon: Record<SourceType, typeof Mail> = {
   whatsapp: Smartphone,
   calendar: Calendar,
   system: Cpu,
+  remoteok: Globe,
+  wttj: Globe,
   other: ExternalLink,
 };
 

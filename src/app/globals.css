@@ -287,3 +287,17 @@ button, a, input, select, textarea {
 .stagger-8  { animation-delay: 0.40s; }
 .stagger-9  { animation-delay: 0.45s; }
 .stagger-10 { animation-delay: 0.50s; }
+
+/* Slide-in drawer (Health drawer in DashboardShell) */
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in-right { animation: slideInRight 0.22s cubic-bezier(.2,.7,.3,1.4) both; }
+
+/* Job row inline expansion shimmer */
+@keyframes jobRowExpand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-job-row-expand { animation: jobRowExpand 0.18s ease-out both; }
