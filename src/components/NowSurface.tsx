@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { NextAction } from '@/types/triage';
 import CardMeta from './CardMeta';
+import ClickSpark from './ClickSpark';
 import SLABadge from './SLABadge';
 import WeeklyWinsBar from './WeeklyWinsBar';
 import OutboundCounter from './OutboundCounter';

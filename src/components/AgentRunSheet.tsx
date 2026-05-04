@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { Bot, CheckCircle2, AlertTriangle, Clock, Zap, ExternalLink, Sparkles } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
+import ShinyText from './ShinyText';
 
 interface HealthRow {
   source: string;
@@ -92,7 +93,7 @@ export default function AgentRunSheet() {
             <Bot size={14} className="text-accent" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-primary leading-none">Agent run-sheet</h3>
+            <h3 className="text-sm font-semibold leading-none"><ShinyText className="text-accent">Agent run-sheet</ShinyText></h3>
             <p className="text-[10px] text-tertiary mt-0.5">Cron-driven actions · last 18h</p>
           </div>
         </div>

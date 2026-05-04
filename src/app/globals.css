@@ -301,3 +301,6 @@ button, a, input, select, textarea {
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-job-row-expand { animation: jobRowExpand 0.18s ease-out both; }
+
+@keyframes shinySweep { 0%,100% { background-position: 250% 50%; } 50% { background-position: -50% 50%; } }
+@media (prefers-reduced-motion: reduce) { [style*='shinySweep'] { animation: none !important; } }

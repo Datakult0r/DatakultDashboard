@@ -18,6 +18,7 @@ import ErrorBoundary from './ErrorBoundary';
 import CommandPalette, { PaletteIcons, type PaletteCommand } from './CommandPalette';
 import ShortcutHelpModal from './ShortcutHelpModal';
 import { useToast } from './Toast';
+import { playSuccess, playSkip, playError } from '@/lib/feedback';
 import type { CustomerEngagement } from '@/types/triage';
 
 type Surface = 'now' | 'pipeline' | 'intake';
@@ -220,10 +221,12 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       body: JSON.stringify({ id }),
     });
     if (!r.ok) {
+      playError();
       toast.push('error', 'Failed to approve');
       throw new Error('Failed to approve');
     }
     setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'approved' as const } : i)));
+    playSuccess();
     toast.push('success', 'Approved · SLA clock started');
   }, [toast]);
 
@@ -236,10 +239,12 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       body: JSON.stringify({ id }),
     });
     if (!r.ok) {
+      playError();
       toast.push('error', 'Failed to reject');
       throw new Error('Failed to reject');
     }
     setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, action_status: 'rejected' as const } : i)));
+    playSkip();
     toast.push('info', 'Skipped', {
       label: 'Undo',
       run: async () => {

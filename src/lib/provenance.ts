@@ -7,6 +7,8 @@
  *   2. WHICH ACTION the dashboard is proposing (Easy Apply, Reply DM, Send proposal…)
  */
 
+export type BrandKey = 'linkedin' | 'apify' | 'perplexity' | 'beeper' | 'gmail' | 'google_calendar' | 'browser_use' | 'firecrawl' | 'remoteok' | null;
+
 export interface MethodLabel {
   /** Short label e.g. "Apify · LinkedIn" */
   short: string;
@@ -16,6 +18,8 @@ export interface MethodLabel {
   icon: 'globe' | 'mail' | 'message' | 'briefcase' | 'newspaper' | 'calendar' | 'cpu' | 'link';
   /** Tailwind text class for the chip */
   tone: 'info' | 'accent' | 'success' | 'money' | 'warning' | 'tertiary';
+  /** Brand key for BrandIcons map (when method has a recognizable brand mark). */
+  brandKey?: BrandKey;
 }
 
 /** Map an internal `source` value to the user-facing "how did we get this?" label */
@@ -23,36 +27,36 @@ export function methodFor(source: string | null | undefined, category?: string |
   const s = (source ?? '').toLowerCase();
   switch (s) {
     case 'linkedin':
-      return { short: 'Apify · LinkedIn job board', hint: 'Public LinkedIn job listing scraped via Apify (no LinkedIn login used).', icon: 'briefcase', tone: 'info' };
+      return { short: 'Apify · LinkedIn job board', hint: 'Public LinkedIn job listing scraped via Apify (no LinkedIn login used).', icon: 'briefcase', tone: 'info', brandKey: 'linkedin' };
     case 'remoteok':
-      return { short: 'RemoteOK · public feed', hint: 'Pulled from RemoteOK\'s free public JSON feed.', icon: 'globe', tone: 'warning' };
+      return { short: 'RemoteOK · public feed', hint: 'Pulled from RemoteOK\'s free public JSON feed.', icon: 'globe', tone: 'warning', brandKey: 'remoteok' };
     case 'wttj':
-      return { short: 'Welcome to the Jungle', hint: 'Welcome to the Jungle job board (Apify scraper).', icon: 'briefcase', tone: 'success' };
+      return { short: 'Welcome to the Jungle', hint: 'Welcome to the Jungle job board (Apify scraper).', icon: 'briefcase', tone: 'success', brandKey: 'apify' };
     case 'indeed':
-      return { short: 'Indeed', hint: 'Indeed job board scraper.', icon: 'briefcase', tone: 'info' };
+      return { short: 'Indeed', hint: 'Indeed job board scraper.', icon: 'briefcase', tone: 'info', brandKey: 'apify' };
     case 'jobup':
       return { short: 'JobUp.ch', hint: 'Swiss job board.', icon: 'briefcase', tone: 'info' };
     case 'gmail':
     case 'email':
-      return { short: 'Gmail (work)', hint: 'Read from philippe.kung@clinicofai.com inbox via Gmail API.', icon: 'mail', tone: 'info' };
+      return { short: 'Gmail (work)', hint: 'Read from philippe.kung@clinicofai.com inbox via Gmail API.', icon: 'mail', tone: 'info', brandKey: 'gmail' };
     case 'gmail_personal':
-      return { short: 'Gmail (personal)', hint: 'Read from philippelobokung@gmail.com inbox via Gmail API.', icon: 'mail', tone: 'accent' };
+      return { short: 'Gmail (personal)', hint: 'Read from philippelobokung@gmail.com inbox via Gmail API.', icon: 'mail', tone: 'accent', brandKey: 'gmail' };
     case 'linkedin_dm':
     case 'beeper':
-      return { short: 'Beeper · LinkedIn DMs', hint: 'LinkedIn direct message bridged through Beeper Desktop.', icon: 'message', tone: 'accent' };
+      return { short: 'Beeper · LinkedIn DMs', hint: 'LinkedIn direct message bridged through Beeper Desktop.', icon: 'message', tone: 'accent', brandKey: 'beeper' };
     case 'whatsapp':
-      return { short: 'Beeper · WhatsApp', hint: 'WhatsApp message bridged through Beeper Desktop.', icon: 'message', tone: 'success' };
+      return { short: 'Beeper · WhatsApp', hint: 'WhatsApp message bridged through Beeper Desktop.', icon: 'message', tone: 'success', brandKey: 'beeper' };
     case 'calendar':
-      return { short: 'Google Calendar', hint: 'Read from your Google Calendar via Calendar API.', icon: 'calendar', tone: 'tertiary' };
+      return { short: 'Google Calendar', hint: 'Read from your Google Calendar via Calendar API.', icon: 'calendar', tone: 'tertiary', brandKey: 'google_calendar' };
     case 'system':
       // Perplexity items are stored with source='system' — disambiguate by category
-      if (category === 'event') return { short: 'Perplexity · events search', hint: 'AI conferences/meetups in CH + EU discovered via Perplexity Sonar.', icon: 'calendar', tone: 'success' };
-      if (category === 'news')  return { short: 'Perplexity · news search', hint: 'AI/tech news discovered via Perplexity Sonar with citations.', icon: 'newspaper', tone: 'info' };
+      if (category === 'event') return { short: 'Perplexity · events search', hint: 'AI conferences/meetups in CH + EU discovered via Perplexity Sonar.', icon: 'calendar', tone: 'success', brandKey: 'perplexity' };
+      if (category === 'news')  return { short: 'Perplexity · news search', hint: 'AI/tech news discovered via Perplexity Sonar with citations.', icon: 'newspaper', tone: 'info', brandKey: 'perplexity' };
       return { short: 'System', hint: 'Internal system entry.', icon: 'cpu', tone: 'tertiary' };
     case 'firecrawl':
-      return { short: 'Firecrawl · web scrape', hint: 'Page content scraped via Firecrawl.', icon: 'link', tone: 'tertiary' };
+      return { short: 'Firecrawl · web scrape', hint: 'Page content scraped via Firecrawl.', icon: 'link', tone: 'tertiary', brandKey: 'firecrawl' };
     case 'browser_use':
-      return { short: 'Browser Use Cloud', hint: 'Action taken by an automated browser in Browser Use Cloud.', icon: 'cpu', tone: 'success' };
+      return { short: 'Browser Use Cloud', hint: 'Action taken by an automated browser in Browser Use Cloud.', icon: 'cpu', tone: 'success', brandKey: 'browser_use' };
     default:
       return { short: source ?? 'Unknown', hint: 'Source not classified.', icon: 'link', tone: 'tertiary' };
   }

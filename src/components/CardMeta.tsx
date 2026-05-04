@@ -17,6 +17,7 @@ import {
   Building2, ExternalLink, Send, Zap,
 } from 'lucide-react';
 import { methodFor, actionFor, safeContactUrl, linkedInHandle } from '@/lib/provenance';
+import { BRAND_BY_METHOD } from './BrandIcons';
 import { clearbitLogoUrl, locationFlag } from '@/lib/company-logo';
 
 const METHOD_ICONS = {
@@ -70,6 +71,7 @@ export default function CardMeta({
   company, contactName, contactUrl, contactEmail, location, postedText, compact,
 }: CardMetaProps) {
   const m = methodFor(source ?? null, category ?? null);
+  const BrandIcon = m.brandKey ? BRAND_BY_METHOD[m.brandKey] : null;
   const MIcon = METHOD_ICONS[m.icon] ?? LinkIcon;
   const a = actionFor(actionType ?? null, category ?? null, applyType ?? null);
   const flag = locationFlag(location);
@@ -83,7 +85,7 @@ export default function CardMeta({
     return (
       <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-mono">
         <span title={m.hint} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border ${TONE_CLS[m.tone]}`}>
-          <MIcon size={9} /> {m.short}
+          {BrandIcon ? <BrandIcon size={11} /> : <MIcon size={9} />} {m.short}
         </span>
         {a && (
           <span title={a.hint} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border ${TONE_CLS[a.tone]}`}>
@@ -100,7 +102,7 @@ export default function CardMeta({
       {/* Row 1 — provenance + action chips */}
       <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-mono">
         <span title={m.hint} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border ${TONE_CLS[m.tone]}`}>
-          <MIcon size={10} /> via {m.short}
+          {BrandIcon ? <BrandIcon size={12} /> : <MIcon size={10} />} via {m.short}
         </span>
         {a && (
           <span title={a.hint} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border ${TONE_CLS[a.tone]}`}>
