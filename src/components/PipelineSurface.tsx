@@ -44,32 +44,37 @@ export default function PipelineSurface({ applications, onApplicationStatusChang
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Summary stats row */}
       {(totalActive > 0 || weightedActive > 0 || (wonStage && wonStage.count > 0) || activeApps > 0) && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <SummaryTile label="Active customers"   value={totalActive.toString()} color="text-accent" />
-          <SummaryTile label="Weighted pipeline"  value={`€${weightedActive.toLocaleString()}`} color="text-money" />
-          <SummaryTile label="Deals won"          value={(wonStage?.count ?? 0).toString()} color="text-success" />
-          <SummaryTile label="Active job apps"    value={activeApps.toString()} color="text-info" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <SummaryTile label="Active customers" value={totalActive.toString()} color="accent" icon={<Target size={14} />} />
+          <SummaryTile label="Weighted pipeline" value={`€${weightedActive.toLocaleString()}`} color="money" icon={<Target size={14} />} />
+          <SummaryTile label="Deals won" value={(wonStage?.count ?? 0).toString()} color="success" icon={<Target size={14} />} />
+          <SummaryTile label="Active job apps" value={activeApps.toString()} color="info" icon={<Briefcase size={14} />} />
         </div>
       )}
 
-      <div className="flex items-center gap-1 border-b border-border/40 pb-2">
+      {/* Subtab navigation */}
+      <div className="flex items-center gap-1">
         {subtabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setSubtab(t.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
               subtab === t.id
-                ? 'bg-accent/15 text-accent'
-                : 'text-secondary hover:text-primary hover:bg-elevated/40'
+                ? 'bg-accent/12 text-accent shadow-sm shadow-accent/5'
+                : 'text-secondary/70 hover:text-primary hover:bg-elevated/40'
             }`}
           >
             {t.icon}
             <span>{t.label}</span>
             {t.count > 0 && (
-              <span className="text-[10px] font-mono opacity-70">{t.count}</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                subtab === t.id ? 'bg-accent/15 text-accent' : 'bg-elevated/60 text-tertiary'
+              }`}>
+                {t.count}
+              </span>
             )}
           </button>
         ))}
@@ -87,11 +92,23 @@ export default function PipelineSurface({ applications, onApplicationStatusChang
   );
 }
 
-function SummaryTile({ label, value, color }: { label: string; value: string; color: string }) {
+function SummaryTile({ label, value, color, icon }: { label: string; value: string; color: string; icon: React.ReactNode }) {
+  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+    accent:  { bg: 'bg-accent/5',  text: 'text-accent',  border: 'border-accent/15' },
+    money:   { bg: 'bg-money/5',   text: 'text-money',   border: 'border-money/15' },
+    success: { bg: 'bg-success/5', text: 'text-success', border: 'border-success/15' },
+    info:    { bg: 'bg-info/5',    text: 'text-info',    border: 'border-info/15' },
+  };
+  const c = colorMap[color] || colorMap.accent;
   return (
-    <div className="bg-surface border border-border rounded-md px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-tertiary font-mono">{label}</div>
-      <div className={`text-lg font-mono font-semibold mt-0.5 ${color}`}>{value}</div>
+    <div className={`relative ${c.bg} border ${c.border} rounded-xl px-4 py-3 overflow-hidden stat-glow ${c.text}`}>
+      <div className="relative">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-wider text-tertiary font-mono">{label}</div>
+          <span className="opacity-20">{icon}</span>
+        </div>
+        <div className={`text-2xl font-mono font-bold mt-1 ${c.text} count-animate`}>{value}</div>
+      </div>
     </div>
   );
 }

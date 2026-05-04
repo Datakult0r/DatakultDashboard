@@ -87,25 +87,6 @@ function normalizeLinkedInJob(raw: Record<string, unknown>): ApifyJobResult {
 }
 
 /**
- * Normalize general job scraper output (Indeed, RemoteOK, Glassdoor).
- */
-function normalizeGeneralJob(raw: Record<string, unknown>, source: 'indeed' | 'remoteok' | 'glassdoor'): ApifyJobResult {
-  return {
-    title: String(raw.title || raw.jobTitle || raw.positionName || ''),
-    company: String(raw.company || raw.companyName || raw.employer || ''),
-    location: String(raw.location || raw.jobLocation || ''),
-    jobUrl: String(raw.url || raw.jobUrl || raw.link || ''),
-    applyUrl: raw.applyUrl ? String(raw.applyUrl) : null,
-    description: String(raw.description || raw.jobDescription || '').slice(0, 3000),
-    postedAt: String(raw.postedAt || raw.datePosted || ''),
-    salary: raw.salary ? String(raw.salary) : null,
-    jobType: raw.jobType ? String(raw.jobType) : null,
-    easyApply: false,
-    source,
-  };
-}
-
-/**
  * Deduplicate jobs by URL and title+company combo.
  */
 function deduplicateJobs(jobs: ApifyJobResult[]): ApifyJobResult[] {
@@ -170,30 +151,10 @@ export async function discoverJobs(): Promise<ApifyRunResult> {
     errors.push(`LinkedIn scraper: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // ── General Job Scraper (Indeed) ──
-  // misceres/indeed-scraper expects { country, position, location, maxItems }.
-  // The previous {queries, locations, sortBy} input shape was wrong and the actor
-  // run failed. Switch to a single call per query to stay within actor limits.
-  try {
-    for (const q of SEARCH_QUERIES.slice(0, 2)) {
-      const generalResults = await runActor(
-        apiToken,
-        'misceres~indeed-scraper',
-        {
-          country: 'US',
-          position: q,
-          location: 'Remote',
-          maxItems: 10,
-        },
-        45,
-      );
-      for (const raw of generalResults) {
-        allJobs.push(normalizeGeneralJob(raw, 'indeed'));
-      }
-    }
-  } catch (err) {
-    errors.push(`Indeed scraper: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  // ── Indeed scraper REMOVED (May 2026) ──
+  // misceres/indeed-scraper consistently times out (status: TIMED-OUT) regardless of
+  // input shape. LinkedIn alone delivers ~20-30 GenAI remote jobs/day, which is plenty.
+  // Bringing Indeed back in v3.2 means picking a different actor — leave it off until then.
 
   const deduplicated = deduplicateJobs(allJobs);
   const durationMs = Date.now() - startTime;

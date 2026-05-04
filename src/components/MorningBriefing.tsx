@@ -86,31 +86,37 @@ export default function MorningBriefing() {
   if (!data || !data.briefing) return null;
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4">
-      <div className="flex items-baseline justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Sparkles size={14} className="text-accent" />
-          <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
-            Chief of staff briefing
-          </span>
-          {data.generatedAt && (
-            <span className="text-[10px] font-mono text-tertiary">
-              · {formatDistanceToNow(new Date(data.generatedAt), { addSuffix: true })}
-              {data.cached && ' (cached)'}
+    <div className="relative bg-surface border border-border/60 rounded-xl p-4 sm:p-5 overflow-hidden">
+      {/* Subtle accent gradient in top-left corner */}
+      <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
+      <div className="relative">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-accent/10 flex items-center justify-center">
+              <Sparkles size={12} className="text-accent" />
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
+              Briefing
             </span>
-          )}
+            {data.generatedAt && (
+              <span className="text-[9px] font-mono text-tertiary/60">
+                {formatDistanceToNow(new Date(data.generatedAt), { addSuffix: true })}
+                {data.cached && ' · cached'}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className="p-1.5 text-tertiary hover:text-accent hover:bg-accent/8 rounded-lg disabled:opacity-50 transition-all"
+            aria-label="Regenerate briefing"
+            title="Regenerate"
+          >
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+          </button>
         </div>
-        <button
-          onClick={() => load(true)}
-          disabled={refreshing}
-          className="text-tertiary hover:text-accent disabled:opacity-50"
-          aria-label="Regenerate briefing"
-          title="Regenerate"
-        >
-          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-        </button>
+        <p className="text-sm text-primary/90 leading-relaxed">{data.briefing}</p>
       </div>
-      <p className="text-sm text-primary leading-relaxed">{data.briefing}</p>
     </div>
   );
 }

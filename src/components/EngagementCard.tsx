@@ -64,7 +64,7 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
   const showFinancials = editing || value > 0;
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 hover:border-border-strong transition-colors">
+    <div className="surface-card bg-surface border border-border/60 rounded-xl p-4 hover:border-border-strong transition-all">
       <div className="flex items-start justify-between gap-2 mb-3">
         {editing ? (
           <input
@@ -209,20 +209,30 @@ export default function EngagementCard({ engagement, onUpdate, onDelete }: Engag
 
       {/* Stage advancer */}
       <div className="flex items-center gap-1 flex-wrap">
-        {STAGE_OPTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => advanceStage(s)}
-            disabled={busy}
-            className={`px-2 py-0.5 text-[10px] uppercase tracking-wider font-mono rounded border transition-colors ${
-              engagement.stage === s
-                ? 'bg-accent/15 text-accent border-accent/40'
-                : 'text-tertiary border-border hover:text-secondary hover:border-border-strong'
-            } disabled:opacity-50`}
-          >
-            {s}
-          </button>
-        ))}
+        {STAGE_OPTIONS.map((s) => {
+          const stageColors: Record<string, string> = {
+            lead: 'bg-info/15 text-info border-info/30',
+            discovery: 'bg-accent/15 text-accent border-accent/30',
+            proposal: 'bg-money/15 text-money border-money/30',
+            won: 'bg-success/15 text-success border-success/30',
+            lost: 'bg-danger/15 text-danger border-danger/30',
+            paused: 'bg-secondary/15 text-secondary border-secondary/30',
+          };
+          return (
+            <button
+              key={s}
+              onClick={() => advanceStage(s)}
+              disabled={busy}
+              className={`px-2 py-0.5 text-[10px] uppercase tracking-wider font-mono rounded-md border transition-all ${
+                engagement.stage === s
+                  ? stageColors[s] || 'bg-accent/15 text-accent border-accent/30'
+                  : 'text-tertiary/60 border-border/40 hover:text-secondary hover:border-border-strong'
+              } disabled:opacity-50`}
+            >
+              {s}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -480,24 +480,31 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       </div>
 
       {/* Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <ErrorBoundary label={activeSurface}>
-          <div key={activeSurface} className="animate-tab-enter">
+          <div key={activeSurface} className="animate-surface-enter">
             {renderSurface()}
           </div>
         </ErrorBoundary>
       </main>
 
       {/* Footer */}
-      <footer className="glass border-t mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-[11px] text-tertiary font-mono">
-          <span className="text-[10px] tracking-[0.15em] uppercase">
-            Operator · {dateScope.toUpperCase()} · {stats?.pending_actions_count ?? pendingCount} pending
-          </span>
-          <div className="flex items-center gap-3">
-            <span>Live · {format(now, 'HH:mm:ss')}</span>
-            <span className="opacity-30">|</span>
-            <span>{items.length}/{allItems.length} items · {applications.length} apps</span>
+      <footer className="glass-heavy border-t border-border/20 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between text-[10px] text-tertiary/70 font-mono">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+              Live
+            </span>
+            <span className="opacity-30">·</span>
+            <span>{format(now, 'HH:mm:ss')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>{dateScope.toUpperCase()}</span>
+            <span className="opacity-30">·</span>
+            <span>{items.length} items</span>
+            <span className="opacity-30">·</span>
+            <span>{stats?.pending_actions_count ?? pendingCount} pending</span>
           </div>
         </div>
       </footer>

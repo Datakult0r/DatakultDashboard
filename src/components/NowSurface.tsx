@@ -113,14 +113,28 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
   const pendingCount = actions.filter((a) => a.reason === 'pending_review').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Summary header — only shows when there's something to do */}
       {hasActions && (
-        <div className="flex items-center gap-3 text-[11px] font-mono text-tertiary px-1">
-          <span>Focus list:</span>
-          {pendingCount > 0 && <span className="text-accent">{pendingCount} pending</span>}
-          {breachCount > 0 && <span className="text-danger">{breachCount} overdue</span>}
-          {dueCount > 0 && <span className="text-money">{dueCount} engagement{dueCount === 1 ? '' : 's'} due</span>}
+        <div className="flex items-center gap-3 px-1">
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider">
+            <span className="text-tertiary">Focus</span>
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent">
+                {pendingCount} pending
+              </span>
+            )}
+            {breachCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger/10 text-danger">
+                {breachCount} overdue
+              </span>
+            )}
+            {dueCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-money/10 text-money">
+                {dueCount} due
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -229,48 +243,70 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
     action.reason !== 'engagement_due' &&
     ['gmail','email','linkedin','linkedin_dm','beeper'].includes((action.source || '').toLowerCase());
   return (
-    <div className="hero-card rounded-xl p-6 animate-fade-up">
-      <div className="flex items-start justify-between gap-4 mb-4">
+    <div className="hero-card rounded-xl p-5 sm:p-6 animate-fade-up">
+      {/* Top meta row */}
+      <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
-          <Icon size={16} className={meta.color} />
-          <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
-            {meta.label}
-          </span>
-          {action.priority !== null && (
-            <span className="text-[10px] font-mono text-tertiary">P{action.priority}</span>
-          )}
+          <div className={`flex items-center justify-center w-7 h-7 rounded-lg ${
+            isBreach ? 'bg-danger/10' : action.reason === 'engagement_due' ? 'bg-money/10' : 'bg-accent/10'
+          }`}>
+            <Icon size={14} className={meta.color} />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary block leading-none">
+              {meta.label}
+            </span>
+            {action.priority !== null && (
+              <span className="text-[9px] font-mono text-tertiary">Priority {action.priority}</span>
+            )}
+          </div>
         </div>
         <SLABadge followUpAt={action.follow_up_at} />
       </div>
 
-      <h2 className="text-2xl font-semibold text-primary leading-tight mb-2">{action.title}</h2>
+      {/* Title — large and prominent */}
+      <h2 className="text-xl sm:text-2xl font-bold text-primary leading-tight mb-2 tracking-[-0.01em]">
+        {action.title}
+      </h2>
       {action.subtitle && (
-        <p className="text-sm text-secondary mb-4 line-clamp-3">{action.subtitle}</p>
+        <p className="text-sm text-secondary/80 mb-4 line-clamp-3 leading-relaxed">{action.subtitle}</p>
       )}
 
-      <div className="flex items-center gap-3 text-[11px] text-tertiary font-mono mb-5">
-        <span>{action.source}</span>
-        {action.contact_name && <span>· {action.contact_name}</span>}
-        <span>· {formatDistanceToNow(new Date(action.created_at), { addSuffix: true })}</span>
+      {/* Contact + time */}
+      <div className="flex items-center gap-2 text-[11px] text-tertiary font-mono mb-5 flex-wrap">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-elevated/60 border border-border/50">
+          {action.source}
+        </span>
+        {action.contact_name && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-elevated/60 border border-border/50">
+            {action.contact_name}
+          </span>
+        )}
+        <span className="text-tertiary/50">
+          {formatDistanceToNow(new Date(action.created_at), { addSuffix: true })}
+        </span>
       </div>
 
+      {/* Draft reply */}
       {action.draft_reply && (
-        <details className="mb-4">
-          <summary className="text-xs font-medium text-accent cursor-pointer hover:text-accent-bright">
+        <details className="mb-5 group/draft">
+          <summary className="text-xs font-medium text-accent cursor-pointer hover:text-accent-bright inline-flex items-center gap-1">
+            <span className="w-4 h-4 rounded bg-accent/10 inline-flex items-center justify-center text-[10px] group-open/draft:rotate-90 transition-transform">›</span>
             Draft reply
           </summary>
-          <pre className="mt-2 p-3 bg-elevated/60 border border-border rounded text-xs text-secondary whitespace-pre-wrap font-mono leading-relaxed max-h-48 overflow-y-auto">
+          <pre className="mt-2 p-3 bg-elevated/40 border border-border/40 rounded-lg text-xs text-secondary/90 whitespace-pre-wrap font-mono leading-relaxed max-h-48 overflow-y-auto">
             {action.draft_reply}
           </pre>
         </details>
       )}
 
-      <div className="flex items-center gap-2">
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 flex-wrap">
         {isBreach ? (
           <button
             onClick={onMark}
             disabled={busy}
-            className="flex items-center gap-2 px-4 py-2 bg-accent text-base font-semibold text-sm rounded-md hover:bg-accent-bright transition-colors disabled:opacity-50"
+            className="glow-btn flex items-center gap-2 px-5 py-2.5 bg-accent text-base font-semibold text-sm rounded-lg hover:bg-accent-bright transition-all disabled:opacity-50"
           >
             <Check size={14} />
             Mark followed up
@@ -279,7 +315,7 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
           <button
             onClick={onApprove}
             disabled={busy}
-            className="flex items-center gap-2 px-4 py-2 bg-accent text-base font-semibold text-sm rounded-md hover:bg-accent-bright transition-colors disabled:opacity-50"
+            className="glow-btn flex items-center gap-2 px-5 py-2.5 bg-accent text-base font-semibold text-sm rounded-lg hover:bg-accent-bright transition-all disabled:opacity-50"
           >
             <Check size={14} />
             Approve
@@ -288,7 +324,7 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
         <button
           onClick={onReject}
           disabled={busy}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-secondary hover:text-danger hover:bg-danger/10 border border-border rounded-md transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm text-secondary hover:text-danger hover:bg-danger/8 border border-border rounded-lg transition-all disabled:opacity-50"
         >
           <X size={14} />
           Skip
@@ -297,7 +333,7 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
           <button
             onClick={onPromote}
             disabled={busy}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-money border border-money/30 hover:bg-money/10 rounded-md disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-sm text-money border border-money/25 hover:bg-money/8 rounded-lg transition-all disabled:opacity-50"
             title="Create a customer engagement from this item"
           >
             <Target size={14} />
@@ -309,7 +345,7 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
             href={action.contact_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-secondary hover:text-primary border border-border rounded-md ml-auto"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-sm text-secondary/70 hover:text-primary border border-border/50 rounded-lg ml-auto transition-all"
           >
             Open <ExternalLink size={12} />
           </a>
@@ -322,31 +358,35 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
 function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
   const meta = reasonMeta(action.reason);
   const isBreach = action.reason === 'sla_breach';
-  const dotColor = action.reason === 'sla_breach'
-    ? 'var(--color-danger)'
+  const borderColor = action.reason === 'sla_breach'
+    ? 'border-l-danger'
     : action.reason === 'engagement_due'
-      ? 'var(--color-money)'
-      : 'var(--color-accent)';
+      ? 'border-l-money'
+      : 'border-l-accent';
   return (
-    <div className="px-4 py-3 flex items-center gap-3 hover:bg-elevated/30 transition-colors">
-      <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />
+    <div className={`px-4 py-3 flex items-center gap-3 hover:bg-elevated/40 transition-all border-l-2 ${borderColor} border-l-opacity-60`}>
       <div className="flex-1 min-w-0">
         <div className="text-sm text-primary font-medium truncate">{action.title}</div>
-        <div className="flex items-center gap-2 text-[11px] text-tertiary font-mono">
-          <span className={meta.color}>{meta.label.split(' ')[0]}</span>
-          <span>·</span>
+        <div className="flex items-center gap-2 text-[10px] text-tertiary font-mono mt-0.5">
+          <span className={`${meta.color} font-medium`}>{meta.label.split(' ')[0]}</span>
+          <span className="opacity-40">·</span>
           <span>{action.source}</span>
-          {action.priority !== null && <span>· P{action.priority}</span>}
+          {action.priority !== null && (
+            <>
+              <span className="opacity-40">·</span>
+              <span>P{action.priority}</span>
+            </>
+          )}
           <SLABadge followUpAt={action.follow_up_at} compact />
         </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {isBreach ? (
           <button
             onClick={onMark}
             disabled={busy}
             title="Mark followed up"
-            className="p-1.5 text-success hover:bg-success/10 rounded disabled:opacity-50"
+            className="p-2 text-success hover:bg-success/10 rounded-lg disabled:opacity-50 transition-all"
           >
             <Check size={14} />
           </button>
@@ -355,7 +395,7 @@ function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
             onClick={onApprove}
             disabled={busy}
             title="Approve"
-            className="p-1.5 text-accent hover:bg-accent/10 rounded disabled:opacity-50"
+            className="p-2 text-accent hover:bg-accent/10 rounded-lg disabled:opacity-50 transition-all"
           >
             <Check size={14} />
           </button>
@@ -364,7 +404,7 @@ function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
           onClick={onReject}
           disabled={busy}
           title="Skip"
-          className="p-1.5 text-tertiary hover:text-danger hover:bg-danger/10 rounded disabled:opacity-50"
+          className="p-2 text-tertiary hover:text-danger hover:bg-danger/8 rounded-lg disabled:opacity-50 transition-all"
         >
           <X size={14} />
         </button>

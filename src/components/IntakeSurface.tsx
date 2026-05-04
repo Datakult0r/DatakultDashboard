@@ -145,46 +145,50 @@ export default function IntakeSurface({ items, onApprove, onReject }: IntakeSurf
   return (
     <div className="space-y-4">
       {/* Search bar */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-md focus-within:border-accent transition-colors">
-        <Search size={14} className="text-tertiary flex-shrink-0" />
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-surface border border-border/50 rounded-xl focus-within:border-accent/50 focus-within:shadow-sm focus-within:shadow-accent/5 transition-all">
+        <Search size={14} className="text-tertiary/60 flex-shrink-0" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search intake — name, company, source, tags…"
-          className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-tertiary"
+          className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-tertiary/50"
         />
         {query && (
-          <button onClick={() => setQuery('')} className="text-tertiary hover:text-secondary" aria-label="Clear search">
+          <button onClick={() => setQuery('')} className="p-0.5 text-tertiary hover:text-secondary rounded-md hover:bg-elevated/60 transition-all" aria-label="Clear search">
             <X size={12} />
           </button>
         )}
         {query && (
-          <span className="text-[10px] font-mono text-tertiary">
-            {filtered.length} match
+          <span className="text-[10px] font-mono text-accent/70 bg-accent/8 px-1.5 py-0.5 rounded-md">
+            {filtered.length} match{filtered.length !== 1 ? 'es' : ''}
           </span>
+        )}
+        {!query && (
+          <span className="hidden sm:inline text-[10px] font-mono text-tertiary/40">/</span>
         )}
       </div>
 
-      <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border/40 pb-2 -mx-1 px-1">
+      {/* Pill subtabs */}
+      <div className="flex items-center gap-1 overflow-x-auto -mx-1 px-1 pb-1">
         {subs.map((t) => (
           <button
             key={t.id}
             onClick={() => setSub(t.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-lg whitespace-nowrap transition-all ${
               sub === t.id
                 ? t.danger
-                  ? 'bg-danger/15 text-danger'
-                  : 'bg-accent/15 text-accent'
-                : 'text-secondary hover:text-primary hover:bg-elevated/40'
+                  ? 'bg-danger/12 text-danger shadow-sm shadow-danger/5'
+                  : 'bg-accent/12 text-accent shadow-sm shadow-accent/5'
+                : 'text-secondary/60 hover:text-primary hover:bg-elevated/40'
             }`}
           >
-            {t.icon}
+            <span className={sub === t.id ? '' : 'opacity-50'}>{t.icon}</span>
             <span>{t.label}</span>
             {t.count > 0 && (
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+              <span className={`text-[9px] font-mono font-bold min-w-[16px] h-4 inline-flex items-center justify-center px-1 rounded-full ${
                 t.danger ? 'bg-danger/20 text-danger' :
-                t.pulse  ? 'bg-warning/20 text-warning animate-pulse-glow' :
-                sub === t.id ? 'bg-accent/20 text-accent' : 'bg-elevated text-tertiary'
+                t.pulse  ? 'bg-warning/15 text-warning animate-pulse-glow' :
+                sub === t.id ? 'bg-accent/15 text-accent' : 'bg-elevated/60 text-tertiary/60'
               }`}>
                 {t.count}
               </span>

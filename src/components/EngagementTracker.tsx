@@ -165,21 +165,27 @@ export default function EngagementTracker() {
             const items = byStage[stage];
             const stageHealth = health.find((h) => h.stage === stage);
             return (
-              <div key={stage} className="bg-elevated/30 border border-border rounded-lg p-3">
-                <div className="flex items-baseline justify-between mb-3">
-                  <h4 className="text-[11px] uppercase tracking-[0.15em] font-mono text-secondary">
-                    {STAGE_LABELS[stage]}
-                  </h4>
-                  <div className="flex items-center gap-2 text-[10px] font-mono">
-                    <span className="text-tertiary">{items.length}</span>
-                    {stageHealth && stageHealth.weighted_value_eur > 0 && (
-                      <span className="text-money">€{stageHealth.weighted_value_eur.toLocaleString()}</span>
-                    )}
+              <div key={stage} className={`bg-elevated/20 border border-border/60 rounded-xl p-3 stage-${stage}`}>
+                <div className="flex items-baseline justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[11px] uppercase tracking-[0.15em] font-mono text-secondary font-semibold">
+                      {STAGE_LABELS[stage]}
+                    </h4>
+                    <span className="text-[10px] font-mono text-tertiary/60 bg-elevated/60 px-1.5 py-0.5 rounded-md">
+                      {items.length}
+                    </span>
                   </div>
+                  {stageHealth && stageHealth.weighted_value_eur > 0 && (
+                    <span className="text-[10px] font-mono text-money/70">
+                      €{stageHealth.weighted_value_eur.toLocaleString()}
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {items.length === 0 ? (
-                    <div className="text-[11px] text-tertiary italic py-4 text-center">empty</div>
+                    <div className="text-[10px] text-tertiary/50 italic py-6 text-center border border-dashed border-border/30 rounded-lg">
+                      No {STAGE_LABELS[stage].toLowerCase()} yet
+                    </div>
                   ) : (
                     items.map((e) => (
                       <EngagementCard
