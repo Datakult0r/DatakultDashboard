@@ -136,22 +136,31 @@ export async function discoverJobs(): Promise<ApifyRunResult> {
   const errors: string[] = [];
 
   // ── LinkedIn Jobs Scraper ──
-  // Using curious_coder/linkedin-jobs-scraper — no login required, public listings only
-  // Verified actor on Apify Store. Zero risk to Philippe's LinkedIn account.
+  // The actor curious_coder/linkedin-jobs-scraper now requires `urls` (search URLs),
+  // not `queries`. Build LinkedIn search URLs from our query × location matrix.
   try {
+    const urls: string[] = [];
+    for (const q of SEARCH_QUERIES.slice(0, 3)) {
+      for (const loc of SEARCH_LOCATIONS) {
+        const params = new URLSearchParams({
+          keywords: q,
+          location: loc,
+          f_TPR: 'r604800',     // posted in last 7 days
+          f_WT: '2',            // remote
+          sortBy: 'DD',         // by date desc
+        });
+        urls.push(`https://www.linkedin.com/jobs/search/?${params.toString()}`);
+      }
+    }
     const linkedInResults = await runActor(
       apiToken,
       'curious_coder~linkedin-jobs-scraper',
       {
-        queries: SEARCH_QUERIES.slice(0, 3), // Top 3 queries to stay within limits
-        locations: SEARCH_LOCATIONS,
-        maxItems: 30,
-        sortBy: 'date',
-        jobType: ['full-time', 'contract'],
-        experienceLevel: ['mid-senior', 'director'],
-        remote: ['remote', 'hybrid'],
+        urls: urls.slice(0, 6),
+        count: 30,
+        scrapeCompany: false,
       },
-      90
+      90,
     );
 
     for (const raw of linkedInResults) {
@@ -162,22 +171,25 @@ export async function discoverJobs(): Promise<ApifyRunResult> {
   }
 
   // ── General Job Scraper (Indeed) ──
-  // Using misceres/indeed-scraper — well-maintained, structured output
+  // misceres/indeed-scraper expects { country, position, location, maxItems }.
+  // The previous {queries, locations, sortBy} input shape was wrong and the actor
+  // run failed. Switch to a single call per query to stay within actor limits.
   try {
-    const generalResults = await runActor(
-      apiToken,
-      'misceres~indeed-scraper',
-      {
-        queries: SEARCH_QUERIES.slice(0, 2),
-        locations: ['Remote'],
-        maxItems: 20,
-        sortBy: 'date',
-      },
-      60
-    );
-
-    for (const raw of generalResults) {
-      allJobs.push(normalizeGeneralJob(raw, 'indeed'));
+    for (const q of SEARCH_QUERIES.slice(0, 2)) {
+      const generalResults = await runActor(
+        apiToken,
+        'misceres~indeed-scraper',
+        {
+          country: 'US',
+          position: q,
+          location: 'Remote',
+          maxItems: 10,
+        },
+        45,
+      );
+      for (const raw of generalResults) {
+        allJobs.push(normalizeGeneralJob(raw, 'indeed'));
+      }
     }
   } catch (err) {
     errors.push(`Indeed scraper: ${err instanceof Error ? err.message : String(err)}`);

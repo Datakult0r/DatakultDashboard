@@ -394,12 +394,26 @@ export async function GET(request: NextRequest) {
           triage_date: today,
         }));
 
-        const { data, error } = await supabaseServer
-          .from('triage_items')
-          .insert(newsItems)
-          .select('id');
-        if (error) throw new Error(error.message);
-        results.perplexityNews.inserted = data?.length || 0;
+        // Insert one row at a time so a single duplicate doesn't sink the whole batch.
+        // The unique partial index idx_triage_idempotency(source, source_url, triage_date)
+        // will reject duplicates; we count insertions vs skips and surface only true errors.
+        let inserted = 0;
+        let skipped = 0;
+        for (const row of newsItems) {
+          const { error } = await supabaseServer.from('triage_items').insert(row);
+          if (!error) {
+            inserted++;
+          } else if (error.message?.includes('duplicate key') || error.code === '23505') {
+            skipped++;
+          } else {
+            throw new Error(error.message);
+          }
+        }
+        results.perplexityNews.inserted = inserted;
+        if (skipped > 0) {
+          // Log the dedup outcome as a separate fallback entry — informational, not error
+          await logHealth(runId, 'perplexity', 'dedup_skip', 'fallback', skipped, 0, undefined, 'idempotency_index');
+        }
       }
     }
   } catch (err) {
