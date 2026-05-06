@@ -331,43 +331,96 @@ function slugifyDomain(company: string): string {
 
 /**
  * Scrape a company\'s About page for cover-letter context.
- * Falls back across /about, /about-us, root domain. Truncates to 2000 chars.
- * Caps a single attempt at ~12s to keep cron under budget.
+ *
+ * v4.3 (May 6 2026): replaced the slug-guesser ({slug}.com/about pattern) with a
+ * /v2/search → /v2/scrape flow. The slug guess was failing on names like
+ * "Mogi I/O : OTT/Podcast/Short Video Apps for you" (3/3 errors May 6 cron).
+ * The search-first pattern was proven manually that night on Everfield, Mindrift,
+ * Pricefx — picks the company\'s real domain even with weird names.
+ *
+ * Cost per call: 2 credits (search) + 1 credit (scrape) = 3 credits.
+ * Budget: 3 calls/day × 30 days × 3 credits = 270/month vs 500 free credits.
+ *
+ * Skips known aggregator/meta domains (LinkedIn, G2, Wikipedia, Eventbrite, …)
+ * to avoid scraping a profile page instead of the company\'s own site.
  */
+const AGGREGATOR_HOSTS = new Set([
+  'linkedin.com', 'www.linkedin.com',
+  'g2.com', 'www.g2.com',
+  'wikipedia.org', 'en.wikipedia.org',
+  'eventbrite.com', 'www.eventbrite.com', 'eventbrite.ie',
+  'crunchbase.com', 'www.crunchbase.com',
+  'glassdoor.com', 'www.glassdoor.com',
+  'youtube.com', 'www.youtube.com',
+  'twitter.com', 'x.com', 'www.x.com',
+  'facebook.com', 'www.facebook.com',
+  'instagram.com', 'www.instagram.com',
+  'reddit.com', 'www.reddit.com',
+]);
+
+interface FirecrawlSearchHit { url?: string; title?: string }
+
+async function searchCompanyDomain(apiKey: string, company: string): Promise<string | null> {
+  const cleaned = company.replace(/[:|·–—].*$/g, '').trim().slice(0, 80); // strip everything after colon/pipe
+  const query = `${cleaned} official website company`;
+  try {
+    const r = await fetch('https://api.firecrawl.dev/v2/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ query, limit: 5 }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const hits: FirecrawlSearchHit[] = data?.data?.web ?? [];
+    for (const hit of hits) {
+      if (!hit.url) continue;
+      try {
+        const u = new URL(hit.url);
+        if (AGGREGATOR_HOSTS.has(u.hostname)) continue;
+        return hit.url;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function scrapeCompanyAbout(company: string): Promise<CompanyEnrichment> {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return { about: null, url: null, durationMs: 0, error: 'FIRECRAWL_API_KEY missing' };
   if (!company) return { about: null, url: null, durationMs: 0, error: 'no company' };
 
-  const slug = slugifyDomain(company);
-  if (!slug) return { about: null, url: null, durationMs: 0, error: 'unparseable company' };
-
-  const candidates = [
-    `https://${slug}.com/about`,
-    `https://${slug}.com/about-us`,
-    `https://www.${slug}.com/about`,
-    `https://${slug}.com`,
-  ];
   const start = Date.now();
-  for (const url of candidates) {
+
+  // Step 1 — search for the real domain
+  const target = await searchCompanyDomain(apiKey, company);
+  if (!target) {
+    // Fall back to old slug-guesser ONCE in case search is rate-limited
+    const slug = slugifyDomain(company);
+    if (!slug) return { about: null, url: null, durationMs: Date.now() - start, error: 'no domain found' };
     try {
-      const page = await scrapeUrl(apiKey, url);
+      const page = await scrapeUrl(apiKey, `https://${slug}.com`);
       if (page && page.markdown.length > 300) {
-        return {
-          about: page.markdown.slice(0, 2000),
-          url,
-          durationMs: Date.now() - start,
-          error: null,
-        };
+        return { about: page.markdown.slice(0, 2000), url: `https://${slug}.com`, durationMs: Date.now() - start, error: null };
       }
-    } catch (err) {
-      // Try the next candidate; only return the last error
-      if (url === candidates[candidates.length - 1]) {
-        return { about: null, url: null, durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) };
-      }
-    }
+    } catch { /* fall through */ }
+    return { about: null, url: null, durationMs: Date.now() - start, error: 'search returned no usable domain' };
   }
-  return { about: null, url: null, durationMs: Date.now() - start, error: 'no usable about page' };
+
+  // Step 2 — scrape the chosen URL
+  try {
+    const page = await scrapeUrl(apiKey, target);
+    if (page && page.markdown.length > 300) {
+      return { about: page.markdown.slice(0, 2000), url: target, durationMs: Date.now() - start, error: null };
+    }
+    return { about: null, url: target, durationMs: Date.now() - start, error: 'scraped content too short' };
+  } catch (err) {
+    return { about: null, url: target, durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export interface EventEnrichment {
