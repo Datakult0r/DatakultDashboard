@@ -14,6 +14,7 @@ import MorningBriefing from './MorningBriefing';
 import NudgesPanel from './NudgesPanel';
 import AgentRunSheet from './AgentRunSheet';
 import YourQueue from './YourQueue';
+import BumpsStrip from './BumpsStrip';
 import { useToast } from './Toast';
 
 interface NowSurfaceProps {
@@ -153,6 +154,9 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
 
       {/* YOUR lane — items the agent prepared, only you can finish */}
       <YourQueue />
+
+      {/* BUMPS strip — Big Underserved Meaningful Pain-points (top 5 by GenAI solvability) */}
+      <BumpsStrip />
 
       {/* Wins + outbound row — visible above the fold even when there are no actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

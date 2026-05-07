@@ -11,7 +11,6 @@ import type { TriageItem, TriageStat, JobApplication, ApplicationStatus } from '
 import NowSurface from './NowSurface';
 import PipelineSurface from './PipelineSurface';
 import IntakeSurface from './IntakeSurface';
-import BumpsSurface from './BumpsSurface';
 import SystemHealthPanel from './SystemHealthPanel';
 import RunwayWidget from './RunwayWidget';
 import ChatWidget from './ChatWidget';
@@ -22,7 +21,7 @@ import { useToast } from './Toast';
 import { playSuccess, playSkip, playError } from '@/lib/feedback';
 import type { CustomerEngagement } from '@/types/triage';
 
-type Surface = 'now' | 'pipeline' | 'intake' | 'bumps';
+type Surface = 'now' | 'pipeline' | 'intake';
 type DateScope = 'today' | '24h' | 'week' | 'all';
 
 interface DashboardShellProps {
@@ -102,7 +101,7 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
-      if (detail === 'now' || detail === 'pipeline' || detail === 'intake' || detail === 'bumps') {
+      if (detail === 'now' || detail === 'pipeline' || detail === 'intake') {
         setActiveSurface(detail);
       } else if (detail === 'health') {
         setHealthOpen(true);
@@ -157,7 +156,6 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         if (k === 'n') { setActiveSurface('now'); cancelGo(); e.preventDefault(); return; }
         if (k === 'p') { setActiveSurface('pipeline'); cancelGo(); e.preventDefault(); return; }
         if (k === 'i') { setActiveSurface('intake'); cancelGo(); e.preventDefault(); return; }
-        if (k === 'b') { setActiveSurface('bumps'); cancelGo(); e.preventDefault(); return; }
         if (k === 'h') { setHealthOpen(true); cancelGo(); e.preventDefault(); return; }
         cancelGo();
         return;
@@ -304,7 +302,6 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
     { id: 'now', label: 'Now', icon: <Zap size={16} />, badge: intakeBadge, pulse: missedPendingCount > 0 },
     { id: 'pipeline', label: 'Pipeline', icon: <Target size={16} />, badge: applications.filter((a) => !['rejected','ghosted','withdrawn'].includes(a.status)).length },
     { id: 'intake', label: 'Intake', icon: <Inbox size={16} />, badge: items.length },
-    { id: 'bumps', label: 'BUMPS', icon: <Sparkles size={16} /> },
   ];
 
   const scopeOptions: { id: DateScope; label: string }[] = [
@@ -320,7 +317,6 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
       { id: 'go-now',      group: 'Navigate', label: 'Go to Now',      hint: 'g n', icon: PaletteIcons.Now,      run: () => setActiveSurface('now') },
       { id: 'go-pipeline', group: 'Navigate', label: 'Go to Pipeline', hint: 'g p', icon: PaletteIcons.Pipeline, run: () => setActiveSurface('pipeline') },
       { id: 'go-intake',   group: 'Navigate', label: 'Go to Intake',   hint: 'g i', icon: PaletteIcons.Intake,   run: () => setActiveSurface('intake') },
-      { id: 'go-bumps',    group: 'Navigate', label: 'Go to BUMPS',    hint: 'g b', icon: PaletteIcons.Add,      run: () => setActiveSurface('bumps') },
       { id: 'go-health',   group: 'Navigate', label: 'Open Health drawer', hint: 'g h', icon: PaletteIcons.Health, run: () => setHealthOpen(true) },
       { id: 'log-outbound', group: 'Action', label: 'Log a prospect touch', icon: PaletteIcons.Outbound,
         run: () => { setActiveSurface('now'); toast.push('info', 'Use the Outbound counter on Now to log it.'); }
@@ -374,8 +370,6 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         );
       case 'intake':
         return <IntakeSurface items={items} onApprove={handleApprove} onReject={handleReject} />;
-      case 'bumps':
-        return <BumpsSurface />;
       // health is now a drawer (right side), opened from header / Cmd+K / g h
     }
   };
