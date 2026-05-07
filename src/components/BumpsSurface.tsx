@@ -1,17 +1,17 @@
 'use client';
 
 /**
- * BumpsSurface — Big Underserved Meaningful Pain-points discovered on Reddit,
- * scored by Claude for GenAI-solvability, ranked by priority.
+ * BumpsSurface — Big Underserved Meaningful Pain-points discovered on Reddit.
  *
- * The pipeline: discovered → researching → validated → building → dropped.
- * Click a row to expand; flip-style reveal of Claude's classification.
+ * v4.7: simplified — no pipeline UI. Just a scrollable list with all the
+ * pertinent info inline so Philippe can browse what was discovered without
+ * having to click around. Sort + search + Reddit link is all you need.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Search, ExternalLink, ChevronDown, ChevronUp, Sparkles, MessageSquare,
-  TrendingUp, ArrowUpRight, RefreshCw, Filter,
+  Search, ExternalLink, Sparkles, MessageSquare, ArrowUpRight,
+  RefreshCw, TrendingUp, Calendar,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
@@ -22,7 +22,6 @@ interface Bump {
   body: string | null;
   url: string;
   subreddit: string | null;
-  author: string | null;
   upvotes: number;
   comments_count: number;
   pain_type: string | null;
@@ -32,46 +31,33 @@ interface Bump {
   claude_target_market: string | null;
   claude_summary: string | null;
   claude_product_idea: string | null;
-  status: string;
-  notes: string | null;
   posted_at: string | null;
   created_at: string;
 }
 
-const STATUS_ORDER = ['discovered', 'researching', 'validated', 'building', 'dropped'] as const;
-type Status = typeof STATUS_ORDER[number];
-
-const STATUS_TONE: Record<string, string> = {
-  discovered: 'border-info/30 bg-info/5 text-info',
-  researching: 'border-warning/30 bg-warning/5 text-warning',
-  validated: 'border-accent/30 bg-accent/5 text-accent',
-  building: 'border-success/30 bg-success/5 text-success',
-  dropped: 'border-border/40 bg-elevated/40 text-tertiary',
-};
-
 const PAIN_TYPE_TONE: Record<string, string> = {
-  'pricing': 'bg-money/15 text-money',
-  'missing-features': 'bg-accent/15 text-accent',
-  'workflow-friction': 'bg-warning/15 text-warning',
-  'switching-tools': 'bg-info/15 text-info',
-  'other': 'bg-elevated text-tertiary',
+  'pricing':            'bg-money/15 text-money',
+  'missing-features':   'bg-accent/15 text-accent',
+  'workflow-friction':  'bg-warning/15 text-warning',
+  'switching-tools':    'bg-info/15 text-info',
+  'other':              'bg-elevated text-tertiary',
 };
+
+type Sort = 'solvability' | 'priority' | 'upvotes' | 'recent';
 
 export default function BumpsSurface() {
   const [bumps, setBumps] = useState<Bump[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('discovered');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sort, setSort] = useState<Sort>('solvability');
+  const [busyAction, setBusyAction] = useState<'scrape' | 'classify' | null>(null);
 
   const reload = async () => {
     setLoading(true);
     const { data } = await supabase
       .from('bumps')
-      .select('*')
-      .order('claude_solvability', { ascending: false, nullsFirst: false })
-      .order('priority_score', { ascending: false, nullsFirst: false })
-      .order('upvotes', { ascending: false })
+      .select('id, title, body, url, subreddit, upvotes, comments_count, pain_type, priority_score, matched_phrases, claude_solvability, claude_target_market, claude_summary, claude_product_idea, posted_at, created_at')
+      .order('created_at', { ascending: false })
       .limit(200);
     setBumps((data ?? []) as Bump[]);
     setLoading(false);
@@ -85,68 +71,63 @@ export default function BumpsSurface() {
     return () => { ch.unsubscribe(); };
   }, []);
 
-  const stats = useMemo(() => ({
-    total: bumps.length,
-    discovered: bumps.filter((b) => b.status === 'discovered').length,
-    researching: bumps.filter((b) => b.status === 'researching').length,
-    validated: bumps.filter((b) => b.status === 'validated').length,
-    building: bumps.filter((b) => b.status === 'building').length,
-    classified: bumps.filter((b) => b.claude_solvability !== null).length,
-  }), [bumps]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return bumps.filter((b) => {
-      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+    const filtered = bumps.filter((b) => {
       if (!q) return true;
-      const blob = `${b.title} ${b.body ?? ''} ${b.subreddit ?? ''} ${b.claude_summary ?? ''}`.toLowerCase();
+      const blob = `${b.title} ${b.body ?? ''} ${b.subreddit ?? ''} ${b.claude_summary ?? ''} ${b.claude_target_market ?? ''} ${b.claude_product_idea ?? ''}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [bumps, search, statusFilter]);
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (sort === 'solvability') return (b.claude_solvability ?? -1) - (a.claude_solvability ?? -1);
+      if (sort === 'priority')    return (b.priority_score ?? -1) - (a.priority_score ?? -1);
+      if (sort === 'upvotes')     return b.upvotes - a.upvotes;
+      return new Date(b.posted_at ?? b.created_at).getTime() - new Date(a.posted_at ?? a.created_at).getTime();
+    });
+    return sorted;
+  }, [bumps, search, sort]);
 
   const triggerScrape = async () => {
-    setLoading(true);
-    await fetch('/api/bumps/discover').catch(() => {});
-    reload();
+    setBusyAction('scrape');
+    try { await fetch('/api/bumps/discover'); } catch {}
+    await reload();
+    setBusyAction(null);
+  };
+  const triggerClassify = async () => {
+    setBusyAction('classify');
+    try { await fetch('/api/bumps/classify', { method: 'POST', body: JSON.stringify({}) }); } catch {}
+    await reload();
+    setBusyAction(null);
   };
 
-  const triggerClassify = async () => {
-    setLoading(true);
-    await fetch('/api/bumps/classify', { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
-    reload();
-  };
+  const classifiedCount = useMemo(() => bumps.filter((b) => b.claude_solvability !== null).length, [bumps]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
-            <Sparkles size={18} className="text-money" />
-            BUMPS — Big Underserved Meaningful Pain-points
+            <Sparkles size={18} className="text-money" /> BUMPS
           </h3>
           <p className="text-[11px] text-tertiary mt-0.5 leading-snug max-w-2xl">
-            Real user pain points scraped from 10 SaaS / startup / business subreddits, classified by pain type, scored by Claude for GenAI-solvability. Move them through your pipeline (discovered → researching → validated → building) when a candidate looks productizable.
+            Big Underserved Meaningful Pain-points scraped from 10 subreddits (SaaS / startups / Entrepreneur / smallbusiness / marketing / sales / recruiting / Accounting / legaladvice / freelance). Cron runs every Monday 08:00 Lisbon. Claude scores each one 0-100 for GenAI solvability and proposes a product idea.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={triggerScrape} title="Scrape new pain points from Reddit (~$0.05 / 50 results)"
-            className="inline-flex items-center gap-1 text-[11px] font-mono text-warning border border-warning/40 rounded-md px-2 py-1 hover:bg-warning/10">
-            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} /> Scrape
+          <button onClick={triggerScrape} disabled={busyAction === 'scrape'}
+            title="Scrape new pain points from Reddit (~$0.05 / 50 results)"
+            className="inline-flex items-center gap-1 text-[11px] font-mono text-warning border border-warning/40 rounded-md px-2 py-1 hover:bg-warning/10 disabled:opacity-50">
+            <RefreshCw size={11} className={busyAction === 'scrape' ? 'animate-spin' : ''} />
+            Scrape
           </button>
-          <button onClick={triggerClassify} title="Ask Claude to score unclassified rows (~$0.001 each)"
-            className="inline-flex items-center gap-1 text-[11px] font-mono text-accent border border-accent/40 rounded-md px-2 py-1 hover:bg-accent/10">
-            <Sparkles size={11} /> Classify
+          <button onClick={triggerClassify} disabled={busyAction === 'classify'}
+            title="Ask Claude to score unclassified rows (~$0.001 each, max 20 per click)"
+            className="inline-flex items-center gap-1 text-[11px] font-mono text-accent border border-accent/40 rounded-md px-2 py-1 hover:bg-accent/10 disabled:opacity-50">
+            <Sparkles size={11} className={busyAction === 'classify' ? 'animate-spin' : ''} />
+            Classify
           </button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-        <Tile label="Total" value={stats.total} tint="accent" />
-        <Tile label="Discovered" value={stats.discovered} tint="info" />
-        <Tile label="Researching" value={stats.researching} tint="warning" />
-        <Tile label="Validated" value={stats.validated} tint="accent" />
-        <Tile label="Building" value={stats.building} tint="success" />
-        <Tile label="Claude scored" value={stats.classified} tint="money" />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
@@ -155,167 +136,120 @@ export default function BumpsSurface() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter by title, subreddit, Claude summary…"
+            placeholder="Search title, body, Claude summary, product idea, target market…"
             className="w-full pl-9 pr-3 py-2 text-sm bg-elevated/40 border border-border/60 rounded-lg focus:border-accent/40 focus:outline-none transition-colors"
           />
         </div>
-        <div className="flex items-center gap-1 bg-elevated/40 border border-border/60 rounded-lg p-0.5 flex-wrap">
-          <Filter size={11} className="text-tertiary mx-1" />
-          {(['all', ...STATUS_ORDER] as const).map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
-                statusFilter === s ? 'bg-accent/15 text-accent' : 'text-tertiary hover:text-secondary'
-              }`}>
-              {s}
-            </button>
+        <div className="flex items-center gap-1 bg-elevated/40 border border-border/60 rounded-lg p-0.5">
+          {([
+            ['solvability', 'Solvability'],
+            ['priority',    'Priority'],
+            ['upvotes',     'Upvotes'],
+            ['recent',      'Newest'],
+          ] as Array<[Sort, string]>).map(([k, label]) => (
+            <button key={k} onClick={() => setSort(k)}
+              className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
+                sort === k ? 'bg-accent/15 text-accent' : 'text-tertiary hover:text-secondary'
+              }`}>{label}</button>
           ))}
         </div>
+        <span className="text-[10px] font-mono text-tertiary px-2">
+          {bumps.length} total · {classifiedCount} scored
+        </span>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filtered.length === 0 && !loading && (
           <div className="text-center py-12 text-tertiary text-sm border border-dashed border-border rounded-lg">
-            No pain points match. Click Scrape to pull fresh ones from Reddit (weekly cron also runs Mondays at 08:00 Lisbon).
+            <Sparkles size={18} className="mx-auto mb-1 opacity-40" />
+            <p>No pain points match. Click Scrape to pull fresh ones.</p>
+            <p className="text-[10px] mt-1 opacity-70">Weekly cron: Mondays 08:00 Lisbon.</p>
           </div>
         )}
-        {filtered.map((bump) => (
-          <BumpRow key={bump.id} bump={bump}
-            isExpanded={expandedId === bump.id}
-            onToggle={() => setExpandedId(expandedId === bump.id ? null : bump.id)} />
-        ))}
+        {filtered.map((bump) => <BumpCard key={bump.id} bump={bump} />)}
       </div>
     </div>
   );
 }
 
-function Tile({ label, value, tint }: { label: string; value: number; tint: string }) {
-  const tintMap: Record<string, string> = {
-    accent: 'bg-accent/5 text-accent border-accent/15',
-    info: 'bg-info/5 text-info border-info/15',
-    warning: 'bg-warning/5 text-warning border-warning/15',
-    success: 'bg-success/5 text-success border-success/15',
-    money: 'bg-money/5 text-money border-money/15',
-  };
-  return (
-    <div className={`rounded-lg border ${tintMap[tint] ?? tintMap.accent} px-3 py-2`}>
-      <div className="text-[9px] uppercase tracking-wider text-tertiary font-mono">{label}</div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-    </div>
-  );
-}
-
-interface BumpRowProps { bump: Bump; isExpanded: boolean; onToggle: () => void }
-function BumpRow({ bump, isExpanded, onToggle }: BumpRowProps) {
-  const tone = STATUS_TONE[bump.status] ?? STATUS_TONE.discovered;
+function BumpCard({ bump }: { bump: Bump }) {
   const painTone = PAIN_TYPE_TONE[bump.pain_type ?? 'other'];
-  const setStatus = async (e: React.MouseEvent, next: Status) => {
-    e.stopPropagation();
-    await fetch('/api/bumps/status', { method: 'POST', body: JSON.stringify({ id: bump.id, status: next }) });
-  };
+  const score = bump.claude_solvability;
+  const scoreColor = score === null ? 'border-border/40 bg-elevated/30 text-tertiary'
+    : score >= 75 ? 'border-success/40 bg-success/10 text-success'
+    : score >= 50 ? 'border-money/40 bg-money/10 text-money'
+    : score >= 25 ? 'border-warning/40 bg-warning/10 text-warning'
+    : 'border-danger/30 bg-danger/5 text-danger';
 
   return (
-    <div className={`rounded-lg border transition-all ${isExpanded ? 'border-accent/40 bg-elevated/20' : 'border-border/60 bg-surface hover:border-secondary/60'}`}>
-      <button onClick={onToggle} className="w-full text-left px-4 py-3 flex items-center gap-3">
+    <article className="rounded-lg border border-border/60 bg-surface hover:border-secondary/60 transition-colors p-4">
+      <div className="flex items-start gap-3">
         {/* Solvability score chip */}
-        {bump.claude_solvability !== null ? (
-          <div className="shrink-0 w-12 h-12 rounded-lg bg-money/15 text-money flex flex-col items-center justify-center font-mono font-bold ring-1 ring-money/30">
-            <span className="text-base leading-none">{bump.claude_solvability}</span>
-            <span className="text-[8px] tracking-widest mt-0.5 opacity-70">SOLVE</span>
-          </div>
-        ) : (
-          <div className="shrink-0 w-12 h-12 rounded-lg bg-elevated border border-border/40 flex items-center justify-center text-[9px] font-mono text-tertiary">
-            unscored
-          </div>
-        )}
+        <div className={`shrink-0 w-14 h-14 rounded-lg border-2 ${scoreColor} flex flex-col items-center justify-center font-mono font-bold`}>
+          <span className="text-lg leading-none">{score ?? '–'}</span>
+          <span className="text-[8px] tracking-widest mt-0.5 opacity-70">SOLVE</span>
+        </div>
 
         <div className="flex-1 min-w-0">
+          {/* Top meta line */}
           <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-tertiary flex-wrap">
-            {bump.subreddit && <span>r/{bump.subreddit}</span>}
-            {bump.pain_type && (
-              <>
-                <span className="opacity-30">·</span>
-                <span className={`px-1.5 py-px rounded ${painTone}`}>{bump.pain_type}</span>
-              </>
-            )}
-            {bump.priority_score !== null && (
-              <>
-                <span className="opacity-30">·</span>
-                <span className="inline-flex items-center gap-0.5"><TrendingUp size={9} /> P{bump.priority_score.toFixed(1)}</span>
-              </>
-            )}
+            {bump.subreddit && <span className="text-info">r/{bump.subreddit}</span>}
+            {bump.pain_type && (<><span className="opacity-30">·</span>
+              <span className={`px-1.5 py-px rounded ${painTone}`}>{bump.pain_type}</span></>)}
+            {bump.priority_score !== null && (<><span className="opacity-30">·</span>
+              <span className="inline-flex items-center gap-0.5"><TrendingUp size={9} />P{bump.priority_score.toFixed(1)}</span></>)}
             <span className="opacity-30">·</span>
             <span className="inline-flex items-center gap-0.5"><ArrowUpRight size={9} />{bump.upvotes}</span>
             <span className="opacity-30">·</span>
             <span className="inline-flex items-center gap-0.5"><MessageSquare size={9} />{bump.comments_count}</span>
+            {bump.posted_at && (<><span className="opacity-30">·</span>
+              <span className="inline-flex items-center gap-0.5"><Calendar size={9} />{formatDistanceToNow(new Date(bump.posted_at), { addSuffix: true })}</span></>)}
           </div>
-          <p className="text-sm font-medium text-primary truncate mt-0.5" title={bump.title}>{bump.title}</p>
+
+          {/* Title */}
+          <h4 className="text-sm font-semibold text-primary leading-snug mt-1.5">{bump.title}</h4>
+
+          {/* Claude summary (if available) — most useful one-liner */}
           {bump.claude_summary && (
-            <p className="text-[11px] text-secondary line-clamp-1 mt-0.5">{bump.claude_summary}</p>
+            <p className="text-xs text-secondary leading-relaxed mt-1.5">{bump.claude_summary}</p>
           )}
-        </div>
 
-        <span className={`shrink-0 inline-flex items-center px-2 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md border ${tone}`}>
-          {bump.status}
-        </span>
-        <span className="text-tertiary/60 shrink-0 ml-1">{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</span>
-      </button>
+          {/* Body excerpt fallback — only if no Claude summary */}
+          {!bump.claude_summary && bump.body && (
+            <p className="text-xs text-secondary leading-relaxed mt-1.5 line-clamp-3 whitespace-pre-wrap">{bump.body}</p>
+          )}
 
-      {isExpanded && (
-        <div className="px-4 pb-4 border-t border-border/40 animate-fade-in">
-          <div className="grid gap-3 sm:grid-cols-2 mt-3">
-            <div className="space-y-2">
-              {bump.body && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-secondary/60 mb-1">Reddit post excerpt</p>
-                  <p className="text-xs text-secondary leading-relaxed line-clamp-8 whitespace-pre-wrap">{bump.body}</p>
-                </div>
-              )}
-              {bump.matched_phrases && bump.matched_phrases.length > 0 && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-secondary/60 mb-1">Matched pain phrases</p>
-                  <div className="flex flex-wrap gap-1">
-                    {bump.matched_phrases.map((m, i) => (
-                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-money/10 text-money font-mono">{m}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              {bump.claude_target_market && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-secondary/60 mb-1">Target market (Claude)</p>
-                  <p className="text-xs text-primary leading-relaxed">{bump.claude_target_market}</p>
-                </div>
-              )}
-              {bump.claude_product_idea && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-secondary/60 mb-1 flex items-center gap-1">
-                    <Sparkles size={10} /> Product idea (Claude)
-                  </p>
-                  <p className="text-xs text-primary leading-relaxed whitespace-pre-wrap bg-money/5 border border-money/15 rounded-md px-3 py-2">{bump.claude_product_idea}</p>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2 pt-1">
-                <a href={bump.url} target="_blank" rel="noopener noreferrer"
-                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-md transition-colors">
-                  Open on Reddit <ExternalLink size={10} />
-                </a>
-                <div className="inline-flex items-center gap-1 bg-elevated/40 rounded-md p-0.5">
-                  {STATUS_ORDER.map((s) => (
-                    <button key={s} onClick={(e) => setStatus(e, s)}
-                      className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider rounded transition-all ${
-                        bump.status === s ? STATUS_TONE[s] : 'text-tertiary hover:text-secondary'
-                      }`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
+          {/* Claude product idea — the actual value */}
+          {bump.claude_product_idea && (
+            <div className="mt-3 rounded-md border border-money/20 bg-money/[0.04] px-3 py-2">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-money font-mono mb-1">
+                <Sparkles size={10} /> Product idea
+                {bump.claude_target_market && (
+                  <span className="text-tertiary normal-case tracking-normal font-normal ml-1">· for {bump.claude_target_market}</span>
+                )}
               </div>
+              <p className="text-xs text-primary leading-relaxed whitespace-pre-wrap">{bump.claude_product_idea}</p>
             </div>
+          )}
+
+          {/* Matched pain phrases (just chips, no clutter) */}
+          {bump.matched_phrases && bump.matched_phrases.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {bump.matched_phrases.slice(0, 6).map((m, i) => (
+                <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-elevated text-tertiary font-mono">{m}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Single CTA */}
+          <div className="mt-3">
+            <a href={bump.url} target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-info bg-info/10 hover:bg-info/20 rounded-md transition-colors">
+              Open on Reddit <ExternalLink size={11} />
+            </a>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </article>
   );
 }

@@ -469,48 +469,78 @@ export default function DashboardShell({ initialItems, initialStats, initialAppl
         </div>
       </header>
 
-      {/* Surface tabs */}
-      <div className="glass sticky top-[57px] sm:top-[65px] z-30 border-b border-border/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-0.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      {/* Sidebar + main content (v4.7 — replaces horizontal tab bar) */}
+      <div className="flex flex-1 min-h-0">
+        {/* Left sidebar — desktop & tablet (sm+) */}
+        <aside className="hidden sm:flex glass-heavy border-r border-border/30 w-16 lg:w-56 flex-col py-4 sticky top-[57px] sm:top-[65px] h-[calc(100vh-65px)] z-30">
+          <nav className="flex-1 px-2 lg:px-3 space-y-1">
             {surfaces.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setActiveSurface(s.id)}
-                className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap transition-all ${
+                className={`group relative w-full flex items-center gap-3 px-2 lg:px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   activeSurface === s.id
-                    ? 'text-accent'
-                    : 'text-secondary/70 hover:text-primary'
+                    ? 'bg-accent/12 text-accent shadow-sm shadow-accent/10'
+                    : 'text-secondary/70 hover:text-primary hover:bg-elevated/40'
                 } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+                title={s.label}
               >
-                <span className={`transition-colors ${activeSurface === s.id ? 'text-accent' : ''}`}>{s.icon}</span>
-                <span>{s.label}</span>
+                <span className={`shrink-0 transition-colors ${activeSurface === s.id ? 'text-accent' : ''}`}>{s.icon}</span>
+                <span className="hidden lg:inline truncate">{s.label}</span>
                 {typeof s.badge === 'number' && s.badge > 0 && (
-                  <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-mono font-bold ${
+                  <span className={`hidden lg:inline-flex ml-auto items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-mono font-bold ${
                     s.pulse ? 'bg-danger/20 text-danger animate-pulse-glow' :
                     activeSurface === s.id ? 'bg-accent/15 text-accent' : 'bg-elevated/80 text-tertiary'
-                  }`}>
-                    {s.badge}
-                  </span>
+                  }`}>{s.badge}</span>
                 )}
-                {/* Active indicator — glowing bottom bar */}
+                {/* Tablet (sm) — show badge as a tiny dot in the corner since label is hidden */}
+                {typeof s.badge === 'number' && s.badge > 0 && (
+                  <span className={`lg:hidden absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${s.pulse ? 'bg-danger animate-pulse-glow' : 'bg-accent'}`} />
+                )}
+                {/* Active indicator — left bar */}
                 {activeSurface === s.id && (
-                  <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-accent shadow-[0_0_8px_rgba(125,211,160,0.4)]" />
+                  <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r-full bg-accent shadow-[0_0_8px_rgba(125,211,160,0.4)]" />
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="px-2 lg:px-3 mt-3 pt-3 border-t border-border/30 hidden lg:block text-[10px] text-tertiary/70 font-mono">
+            <div className="px-1">⌘K command palette</div>
+            <div className="px-1 mt-1">g + n/p/i/b/h to jump</div>
+          </div>
+        </aside>
+
+        {/* Mobile bottom bar — only on small screens */}
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-30 glass-heavy border-t border-border/30">
+          <div className="grid grid-cols-4 gap-0">
+            {surfaces.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setActiveSurface(s.id)}
+                className={`relative flex flex-col items-center gap-0.5 py-2 transition-all ${
+                  activeSurface === s.id ? 'text-accent' : 'text-secondary/70'
+                }`}
+                title={s.label}
+              >
+                <span>{s.icon}</span>
+                <span className="text-[9px]">{s.label}</span>
+                {typeof s.badge === 'number' && s.badge > 0 && (
+                  <span className="absolute top-1 right-1/4 w-1.5 h-1.5 rounded-full bg-accent" />
                 )}
               </button>
             ))}
           </div>
-        </div>
-      </div>
+        </nav>
 
-      {/* Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <ErrorBoundary label={activeSurface}>
-          <div key={activeSurface} className="animate-surface-enter">
-            {renderSurface()}
-          </div>
-        </ErrorBoundary>
-      </main>
+        {/* Content */}
+        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-8">
+          <ErrorBoundary label={activeSurface}>
+            <div key={activeSurface} className="animate-surface-enter max-w-6xl mx-auto">
+              {renderSurface()}
+            </div>
+          </ErrorBoundary>
+        </main>
+      </div>
 
       {/* Footer */}
       <footer className="glass-heavy border-t border-border/20 mt-auto">
