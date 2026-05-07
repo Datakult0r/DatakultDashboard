@@ -23,13 +23,21 @@ export interface PainPoint {
   body: string | null;
   url: string;
   subreddit: string | null;
+  subredditIconUrl: string | null;
   author: string | null;
+  authorUrl: string | null;
   postedAt: string | null;
   upvotes: number;
   commentsCount: number;
+  engagementRatio: number | null;
   painType: 'pricing' | 'missing-features' | 'workflow-friction' | 'switching-tools' | 'other' | null;
   priorityScore: number | null;
+  classificationConfidence: number | null;
   matchedPhrases: string[];
+  painSummary: string | null;
+  commentSignals: Array<{ author?: string; text?: string; score?: number }> | null;
+  sourceMode: string | null;
+  raw: Record<string, unknown>;
 }
 
 export interface PainFinderResult {
@@ -48,24 +56,42 @@ interface RawPainItem {
   url?: string;
   permalink?: string;
   subreddit?: string;
+  subredditIconUrl?: string;
+  subreddit_icon_url?: string;
   author?: string;
+  authorUrl?: string;
+  author_url?: string;
   createdAt?: string;
   created?: string;
   posted_at?: string;
   ups?: number;
   upvotes?: number;
   score?: number;
+  upvoteRatio?: number;
+  upvote_ratio?: number;
   numComments?: number;
   num_comments?: number;
   painType?: string;
   pain_type?: string;
   classification?: string;
+  confidence?: number;
+  classification_confidence?: number;
+  classificationConfidence?: number;
   priority?: number;
   priorityScore?: number;
   priority_score?: number;
   matchedPhrases?: string[];
   matched_phrases?: string[];
   matchedKeywords?: string[];
+  painSummary?: string;
+  pain_summary?: string;
+  summary?: string;
+  commentSignals?: Array<{ author?: string; text?: string; score?: number }>;
+  comment_signals?: Array<{ author?: string; text?: string; score?: number }>;
+  comments?: Array<{ author?: string; text?: string; score?: number }>;
+  sourceMode?: string;
+  source_mode?: string;
+  source?: string;
 }
 
 const SUBREDDITS_DEFAULT = [
@@ -113,19 +139,28 @@ function shape(raw: RawPainItem): PainPoint | null {
   const title = raw.title;
   const url = raw.url ?? (raw.permalink ? `https://reddit.com${raw.permalink}` : undefined);
   if (!id || !title || !url) return null;
+  const author = raw.author ?? null;
   return {
     redditId: id,
     title,
     body: raw.selftext ?? raw.body ?? raw.text ?? null,
     url,
     subreddit: raw.subreddit ?? null,
-    author: raw.author ?? null,
+    subredditIconUrl: raw.subredditIconUrl ?? raw.subreddit_icon_url ?? null,
+    author,
+    authorUrl: raw.authorUrl ?? raw.author_url ?? (author ? `https://reddit.com/user/${author}` : null),
     postedAt: raw.createdAt ?? raw.created ?? raw.posted_at ?? null,
     upvotes: raw.ups ?? raw.upvotes ?? raw.score ?? 0,
     commentsCount: raw.numComments ?? raw.num_comments ?? 0,
+    engagementRatio: raw.upvoteRatio ?? raw.upvote_ratio ?? null,
     painType: normalizePainType(raw.painType ?? raw.pain_type ?? raw.classification),
     priorityScore: raw.priority ?? raw.priorityScore ?? raw.priority_score ?? null,
+    classificationConfidence: raw.confidence ?? raw.classification_confidence ?? raw.classificationConfidence ?? null,
     matchedPhrases: raw.matchedPhrases ?? raw.matched_phrases ?? raw.matchedKeywords ?? [],
+    painSummary: raw.painSummary ?? raw.pain_summary ?? raw.summary ?? null,
+    commentSignals: raw.commentSignals ?? raw.comment_signals ?? raw.comments ?? null,
+    sourceMode: raw.sourceMode ?? raw.source_mode ?? raw.source ?? null,
+    raw: raw as Record<string, unknown>,
   };
 }
 

@@ -304,3 +304,13 @@ button, a, input, select, textarea {
 
 @keyframes shinySweep { 0%,100% { background-position: 250% 50%; } 50% { background-position: -50% 50%; } }
 @media (prefers-reduced-motion: reduce) { [style*='shinySweep'] { animation: none !important; } }
+
+/* Subtle slide+fade for BUMPS detail panel on selection change (one animation per the brief) */
+@keyframes bumpDetailEnter {
+  from { transform: translateX(8px); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+.animate-bump-detail-enter { animation: bumpDetailEnter 0.25s cubic-bezier(.2,.7,.3,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-bump-detail-enter { animation: none !important; }
+}

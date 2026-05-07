@@ -10,6 +10,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
 import { discoverPainPoints } from '@/lib/reddit-pain-finder';
 
+/** Best-effort subreddit icon lookup via Reddit's public about.json. Cached in-memory per cron run. */
+const ICON_CACHE = new Map<string, string | null>();
+async function resolveSubredditIcon(subreddit: string): Promise<string | null> {
+  if (!subreddit) return null;
+  if (ICON_CACHE.has(subreddit)) return ICON_CACHE.get(subreddit) ?? null;
+  try {
+    const r = await fetch(`https://www.reddit.com/r/${subreddit}/about.json`, {
+      headers: { 'User-Agent': 'DatakultDashboard/4.8 (control-tower)' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) { ICON_CACHE.set(subreddit, null); return null; }
+    const data = await r.json();
+    const icon: string | null =
+      data?.data?.community_icon?.split('?')[0] ||
+      data?.data?.icon_img ||
+      null;
+    ICON_CACHE.set(subreddit, icon);
+    return icon;
+  } catch {
+    ICON_CACHE.set(subreddit, null);
+    return null;
+  }
+}
+
+
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
@@ -44,20 +69,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, discovered: 0 });
   }
 
-  const rows = result.items.map((p) => ({
+  // Resolve subreddit icons in parallel (capped at 10 unique lookups)
+  const uniqueSubs = Array.from(new Set(result.items.map((p) => p.subreddit).filter(Boolean) as string[])).slice(0, 10);
+  await Promise.all(uniqueSubs.map(resolveSubredditIcon));
+
+  const rows = await Promise.all(result.items.map(async (p) => ({
     reddit_id: p.redditId,
     title: p.title,
     body: p.body?.slice(0, 4000) ?? null,
     url: p.url,
     subreddit: p.subreddit,
+    subreddit_icon_url: p.subredditIconUrl ?? (p.subreddit ? await resolveSubredditIcon(p.subreddit) : null),
     author: p.author,
+    author_url: p.authorUrl,
     posted_at: p.postedAt,
     upvotes: p.upvotes,
     comments_count: p.commentsCount,
+    engagement_ratio: p.engagementRatio,
     pain_type: p.painType,
     priority_score: p.priorityScore,
+    classification_confidence: p.classificationConfidence,
     matched_phrases: p.matchedPhrases,
-  }));
+    pain_summary: p.painSummary?.slice(0, 1500) ?? null,
+    comment_signals: p.commentSignals,
+    source_mode: p.sourceMode,
+    raw_data: p.raw,
+  })));
 
   // Idempotent upsert keyed by reddit_id
   const { data, error } = await supabaseServer
