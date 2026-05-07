@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Sparkles, RefreshCw } from 'lucide-react';
+import { BriefingIcon } from './AppIcons';
 import { formatDistanceToNow } from 'date-fns';
 
 interface BriefingResponse {

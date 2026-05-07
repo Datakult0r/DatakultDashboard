@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { Send, Plus, Check, ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'lucide-react';
+import { GoalTargetIcon } from './AppIcons';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { OutboundLog } from '@/types/triage';
@@ -85,7 +86,7 @@ export default function OutboundCounter() {
     <div ref={containerRef} className="bg-surface border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <Send size={14} className={tone.text} />
+          <GoalTargetIcon size={16} className={tone.text} />
           <h3 className="text-sm font-semibold text-primary">Outbound today</h3>
           {today >= DAILY_QUOTA && <Check size={14} className="text-success" />}
         </div>

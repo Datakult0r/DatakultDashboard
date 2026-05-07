@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, CheckCircle2, AlertTriangle, Clock, Zap, ExternalLink, Sparkles } from 'lucide-react';
+import { CronIcon } from './AppIcons';
 import { format, formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import ShinyText from './ShinyText';
@@ -90,7 +91,7 @@ export default function AgentRunSheet() {
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
-            <Bot size={14} className="text-accent" />
+            <CronIcon size={16} className="text-accent" />
           </div>
           <div>
             <h3 className="text-sm font-semibold leading-none"><ShinyText className="text-accent">Agent run-sheet</ShinyText></h3>

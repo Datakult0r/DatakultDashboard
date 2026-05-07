@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { NudgeIcon } from './AppIcons';
 import { Lightbulb, AlertTriangle, AlertCircle, Info, ArrowRight } from 'lucide-react';
 import type { Nudge } from '@/app/api/nudges/route';
 
@@ -39,7 +40,7 @@ export default function NudgesPanel() {
     <div className="bg-surface border border-border rounded-lg overflow-hidden">
       <div className="px-3 py-2 border-b border-border/40 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Lightbulb size={12} className="text-money" />
+          <NudgeIcon size={14} className="text-money" />
           <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-secondary">
             Daily nudges · {nudges.length}
           </span>
