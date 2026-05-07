@@ -15,6 +15,7 @@ import NudgesPanel from './NudgesPanel';
 import AgentRunSheet from './AgentRunSheet';
 import YourQueue from './YourQueue';
 import BumpsStrip from './BumpsStrip';
+import EventsPanel from './EventsPanel';
 import { useToast } from './Toast';
 
 interface NowSurfaceProps {
@@ -144,26 +145,22 @@ export default function NowSurface({ onApprove, onReject, onMarkFollowedUp }: No
       )}
 
       {/* Chief of staff morning briefing — one-paragraph context (Claude) */}
-      <MorningBriefing />
-
-      {/* AGENT lane — what the cron did/will do */}
-      <AgentRunSheet />
-
-      {/* Heuristic nudges — works without Claude, computes from existing data */}
-      <NudgesPanel />
-
-      {/* YOUR lane — items the agent prepared, only you can finish */}
-      <YourQueue />
-
-      {/* BUMPS strip — Big Underserved Meaningful Pain-points (top 5 by GenAI solvability) */}
-      <BumpsStrip />
-
-      {/* Wins + outbound row — visible above the fold even when there are no actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="md:col-span-2">
-          <WeeklyWinsBar />
+      {/* v5.2 — dense 2-column NOW. Main column on the left, info-dense right rail with events + outbound + wins. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 items-start">
+        {/* LEFT — main column */}
+        <div className="space-y-4 min-w-0">
+          <MorningBriefing />
+          <AgentRunSheet />
+          <NudgesPanel />
+          <YourQueue />
+          <BumpsStrip />
         </div>
-        <OutboundCounter />
+        {/* RIGHT — sticky info-dense rail */}
+        <aside className="space-y-3 lg:sticky lg:top-[140px]">
+          <EventsPanel />
+          <OutboundCounter />
+          <WeeklyWinsBar />
+        </aside>
       </div>
 
       {/* Hero or empty state */}

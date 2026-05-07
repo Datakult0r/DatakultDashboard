@@ -43,22 +43,39 @@ export async function POST(request: NextRequest) {
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // v5.1: optional auto-send for Gmail drafts when AUTO_SEND_GMAIL_APPROVED=true.
-    // Only fires for action_type='reply_email' and only after action_status flipped to approved.
-    // LinkedIn DMs intentionally NOT auto-sent — DRAFT ONLY rule per LinkedIn protocol memory.
+    // v5.2: real Gmail send via API when AUTO_SEND_GMAIL_APPROVED=true.
+    // LinkedIn DMs intentionally NOT auto-sent — DRAFT ONLY rule per memory.
     let autoSent = false;
+    let autoSendError: string | null = null;
     if (process.env.AUTO_SEND_GMAIL_APPROVED === 'true' && data?.action_type === 'reply_email' && data?.draft_reply) {
-      // Stub — actual Gmail send via the Gmail API is implemented in the next iteration.
-      // For now, mark as auto_sent in metadata so the dashboard can show the intent without
-      // actually firing the send (avoids accidental email storms during the rollout window).
-      await supabaseServer
-        .from('triage_items')
-        .update({ tags: [...(data.tags || []), 'auto_send_pending'] })
-        .eq('id', id);
-      autoSent = true;
+      try {
+        const { sendGmailReply } = await import('@/lib/gmail-send');
+        const result = await sendGmailReply({
+          account: data.gmail_account === 'personal' ? 'personal' : 'business',
+          inReplyToMessageId: data.gmail_message_id ?? null,
+          threadId: data.gmail_thread_id ?? null,
+          to: data.from_email ?? data.contact_email,
+          subject: data.subject?.startsWith('Re:') ? data.subject : `Re: ${data.subject ?? '(no subject)'}`,
+          body: data.draft_reply,
+        });
+        if (result.ok) {
+          autoSent = true;
+          await supabaseServer
+            .from('triage_items')
+            .update({
+              tags: [...(data.tags ?? []), 'auto_sent'],
+              action_status: 'executed',
+            })
+            .eq('id', id);
+        } else {
+          autoSendError = result.error ?? 'unknown';
+        }
+      } catch (err) {
+        autoSendError = err instanceof Error ? err.message : String(err);
+      }
     }
 
-    return NextResponse.json({ success: true, item: data, sla_days: days, auto_sent: autoSent });
+    return NextResponse.json({ success: true, item: data, sla_days: days, auto_sent: autoSent, auto_send_error: autoSendError });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
