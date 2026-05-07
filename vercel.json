@@ -7,6 +7,10 @@
     {
       "path": "/api/jobs/auto-apply",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/bumps/discover",
+      "schedule": "0 7 * * 1"
     }
   ]
 }
