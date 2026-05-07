@@ -694,6 +694,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Auto-promote high-intent triage rows into customer_engagements (Leads).
+  try {
+    const auto = await fetch(new URL('/api/leads/auto-promote?replay=1', request.url).toString());
+    if (auto.ok) {
+      const j = await auto.json();
+      await logHealth(runId, 'auto_promote', 'leads', 'ok', j.promoted ?? 0, 0);
+    }
+  } catch (autoErr) {
+    await logHealth(runId, 'auto_promote', 'leads', 'error', 0, 0,
+      autoErr instanceof Error ? autoErr.message : String(autoErr));
+  }
+
   // ══════════════════════════════════════════
   // RESPONSE
   // ══════════════════════════════════════════

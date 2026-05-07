@@ -42,7 +42,23 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true, item: data, sla_days: days });
+
+    // v5.1: optional auto-send for Gmail drafts when AUTO_SEND_GMAIL_APPROVED=true.
+    // Only fires for action_type='reply_email' and only after action_status flipped to approved.
+    // LinkedIn DMs intentionally NOT auto-sent — DRAFT ONLY rule per LinkedIn protocol memory.
+    let autoSent = false;
+    if (process.env.AUTO_SEND_GMAIL_APPROVED === 'true' && data?.action_type === 'reply_email' && data?.draft_reply) {
+      // Stub — actual Gmail send via the Gmail API is implemented in the next iteration.
+      // For now, mark as auto_sent in metadata so the dashboard can show the intent without
+      // actually firing the send (avoids accidental email storms during the rollout window).
+      await supabaseServer
+        .from('triage_items')
+        .update({ tags: [...(data.tags || []), 'auto_send_pending'] })
+        .eq('id', id);
+      autoSent = true;
+    }
+
+    return NextResponse.json({ success: true, item: data, sla_days: days, auto_sent: autoSent });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }

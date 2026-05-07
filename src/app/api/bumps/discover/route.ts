@@ -109,5 +109,24 @@ export async function GET(request: NextRequest) {
 
   const inserted = data?.length ?? 0;
   await logHealth('reddit_pain_finder', 'discover_bumps', 'ok', inserted, Date.now() - start);
-  return NextResponse.json({ ok: true, scraped: result.items.length, inserted });
+
+  // Auto-classify newly inserted rows so user doesn't have to click. ~$0.001 each.
+  let classified = 0;
+  if (inserted > 0) {
+    try {
+      const cls = await fetch(new URL('/api/bumps/classify', request.url).toString(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      if (cls.ok) {
+        const j = await cls.json();
+        classified = j.classified ?? 0;
+        await logHealth('claude_haiku', 'classify_bumps', 'ok', classified, 0);
+      }
+    } catch (err) {
+      await logHealth('claude_haiku', 'classify_bumps', 'error', 0, 0,
+        err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return NextResponse.json({ ok: true, scraped: result.items.length, inserted, classified });
 }
