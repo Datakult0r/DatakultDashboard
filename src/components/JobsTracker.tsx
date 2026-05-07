@@ -24,6 +24,7 @@ const SOURCE_LABEL: Record<PhilippeJobSource, string> = {
   wttj: 'Welcome to the Jungle',
   indeed: 'Indeed',
   jobup: 'JobUp.ch',
+  arbeit_swiss: 'Arbeit.Swiss',
   glassdoor: 'Glassdoor',
 };
 

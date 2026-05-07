@@ -67,6 +67,13 @@ export const FirecrawlIcon = wrap(
     <path fill="#fff" d="M12 5c2 2 3 4 3 6.5 0 2-1.4 3.5-3 3.5s-3-1.5-3-3.5C9 9 10 7 12 5zm0 11.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" />
   </>,
 );
+export const ArbeitSwissIcon = wrap(
+  <>
+    <rect width="24" height="24" rx="3" fill="#D52B1E" />
+    <rect x="9.5" y="5" width="5" height="14" fill="#fff" />
+    <rect x="5" y="9.5" width="14" height="5" fill="#fff" />
+  </>,
+);
 export const RemoteOKIcon = wrap(
   <>
     <rect width="24" height="24" rx="3" fill="#000" />
@@ -84,4 +91,5 @@ export const BRAND_BY_METHOD: Record<string, ComponentType<IconProps>> = {
   browser_use: BrowserUseIcon,
   firecrawl: FirecrawlIcon,
   remoteok: RemoteOKIcon,
+  arbeit_swiss: ArbeitSwissIcon,
 };

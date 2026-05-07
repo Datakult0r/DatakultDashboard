@@ -5,6 +5,7 @@ import { scoreEmails } from '@/lib/scoring';
 import { fetchCalendarEvents } from '@/lib/calendar';
 import { discoverJobs } from '@/lib/apify';
 import { discoverJobsRemoteOK } from '@/lib/remoteok';
+import { discoverJobsArbeitSwiss } from '@/lib/arbeit-swiss';
 import { scoreJobs } from '@/lib/job-scoring';
 import { tailorCVForJobs } from '@/lib/cv-tailor';
 import { scrapeIntelligence, scrapeCareerPage, scrapeCompanyAbout } from '@/lib/firecrawl';
@@ -286,9 +287,23 @@ export async function GET(request: NextRequest) {
         const roMsg = roErr instanceof Error ? roErr.message : String(roErr);
         await logHealth(runId, 'remoteok', 'discover_jobs', 'error', 0, 0, roMsg);
       }
+      // Arbeit.Swiss — Switzerland's government job portal (RAV listings).
+      // ~$4/month at 45 jobs/day. Catches Swiss roles that never hit LinkedIn.
+      let arbeitSwissItems: typeof apifyResult.items = [];
+      try {
+        const as = await discoverJobsArbeitSwiss();
+        arbeitSwissItems = as.items;
+        await logHealth(runId, 'arbeit_swiss', 'discover_jobs', as.error ? (as.items.length > 0 ? 'ok' : 'error') : 'ok',
+          as.items.length, as.durationMs, as.error || undefined);
+      } catch (asErr) {
+        const asMsg = asErr instanceof Error ? asErr.message : String(asErr);
+        await logHealth(runId, 'arbeit_swiss', 'discover_jobs', 'error', 0, 0, asMsg);
+      }
+
       // Merge dedup-by-jobUrl
       const seenUrls = new Set(apifyResult.items.map((j) => j.jobUrl));
       for (const j of remoteOkItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
+      for (const j of arbeitSwissItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
 
       results.jobs.discovered = apifyResult.items.length;
 
@@ -316,7 +331,7 @@ export async function GET(request: NextRequest) {
           .map((s) => ({
             title: `${s.job.title} at ${s.job.company}`,
             subtitle: s.job.description.slice(0, 200),
-            source: (s.job.source === 'linkedin' || s.job.source === 'remoteok') ? s.job.source : 'other',
+            source: (s.job.source === 'linkedin' || s.job.source === 'remoteok' || s.job.source === 'arbeit_swiss') ? s.job.source : 'other',
             category: 'job' as const,
             score: s.score,
             score_label: s.scoreLabel,

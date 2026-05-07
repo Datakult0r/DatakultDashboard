@@ -6,7 +6,7 @@
 export type TriageCategory = 'urgent' | 'review' | 'job' | 'news' | 'event' | 'schedule' | 'done';
 export type TriageStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type ScoreLabel = 'strong' | 'apply' | 'light' | 'skip' | 'priority';
-export type SourceType = 'email' | 'gmail' | 'gmail_personal' | 'linkedin' | 'linkedin_dm' | 'beeper' | 'whatsapp' | 'calendar' | 'system' | 'remoteok' | 'wttj' | 'other';
+export type SourceType = 'email' | 'gmail' | 'gmail_personal' | 'linkedin' | 'linkedin_dm' | 'beeper' | 'whatsapp' | 'calendar' | 'system' | 'remoteok' | 'wttj' | 'arbeit_swiss' | 'other';
 
 /** A2UI Action Types — what the agent prepared for Philippe to approve */
 export type ActionType =
@@ -294,7 +294,7 @@ export interface JobApplication {
 // ==================================================
 export type PhilippeJobDecision = 'STRONG_APPLY' | 'APPLY' | 'LIGHT' | 'SKIP';
 export type PhilippeJobApplyStatus = 'SCORED' | 'QUEUED' | 'APPLYING' | 'APPLIED' | 'FAILED' | 'SKIPPED';
-export type PhilippeJobSource = 'linkedin' | 'remoteok' | 'wttj' | 'indeed' | 'jobup' | 'glassdoor';
+export type PhilippeJobSource = 'linkedin' | 'remoteok' | 'wttj' | 'indeed' | 'jobup' | 'arbeit_swiss' | 'glassdoor';
 
 export interface PhilippeJob {
   id: string;

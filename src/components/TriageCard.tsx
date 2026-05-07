@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, ExternalLink, Check, Mail, MessageSquare, Calendar, Globe, Smartphone, Cpu, Target } from 'lucide-react';
+import { Copy, ExternalLink, Check, Mail, MessageSquare, Calendar, Globe, Smartphone, Cpu, Target, Briefcase } from 'lucide-react';
 import type { TriageItem, SourceType } from '@/types/triage';
 import SourceTag from './SourceTag';
 import ScoreChip from './ScoreChip';
@@ -24,6 +24,7 @@ const sourceIcon: Record<SourceType, typeof Mail> = {
   system: Cpu,
   remoteok: Globe,
   wttj: Globe,
+  arbeit_swiss: Briefcase,
   other: ExternalLink,
 };
 

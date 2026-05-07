@@ -27,6 +27,7 @@ export default function SourceTag({ source, sourceType }: SourceTagProps) {
     system: { bg: 'bg-gray-300/40', text: 'text-gray-500' },
     remoteok: { bg: 'bg-warning/15', text: 'text-warning' },
     wttj: { bg: 'bg-success/10', text: 'text-success' },
+    arbeit_swiss: { bg: 'bg-red-700/15', text: 'text-red-500' },
     other: { bg: 'bg-gray-300/40', text: 'text-secondary' },
   };
 

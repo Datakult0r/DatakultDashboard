@@ -7,7 +7,7 @@
  *   2. WHICH ACTION the dashboard is proposing (Easy Apply, Reply DM, Send proposal…)
  */
 
-export type BrandKey = 'linkedin' | 'apify' | 'perplexity' | 'beeper' | 'gmail' | 'google_calendar' | 'browser_use' | 'firecrawl' | 'remoteok' | null;
+export type BrandKey = 'linkedin' | 'apify' | 'perplexity' | 'beeper' | 'gmail' | 'google_calendar' | 'browser_use' | 'firecrawl' | 'remoteok' | 'arbeit_swiss' | null;
 
 export interface MethodLabel {
   /** Short label e.g. "Apify · LinkedIn" */
@@ -30,6 +30,8 @@ export function methodFor(source: string | null | undefined, category?: string |
       return { short: 'Apify · LinkedIn job board', hint: 'Public LinkedIn job listing scraped via Apify (no LinkedIn login used).', icon: 'briefcase', tone: 'info', brandKey: 'linkedin' };
     case 'remoteok':
       return { short: 'RemoteOK · public feed', hint: 'Pulled from RemoteOK\'s free public JSON feed.', icon: 'globe', tone: 'warning', brandKey: 'remoteok' };
+    case 'arbeit_swiss':
+      return { short: 'Arbeit.Swiss · government portal', hint: 'Switzerland\'s official government job portal (Job-Room.ch / RAV) via Apify. Authoritative for the Swiss market — every Swiss employer above the headcount threshold posts here first.', icon: 'briefcase', tone: 'success', brandKey: 'arbeit_swiss' };
     case 'wttj':
       return { short: 'Welcome to the Jungle', hint: 'Welcome to the Jungle job board (Apify scraper).', icon: 'briefcase', tone: 'success', brandKey: 'apify' };
     case 'indeed':
