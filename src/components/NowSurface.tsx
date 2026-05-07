@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Zap, ExternalLink, Check, X, AlertTriangle, Target } from 'lucide-react';
+import { Zap, ExternalLink, Check, X, AlertTriangle, Target, Briefcase, MapPin, DollarSign, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { NextAction } from '@/types/triage';
@@ -282,6 +282,9 @@ function HeroCard({ action, busy, onApprove, onReject, onMark, onPromote }: Card
         <p className="text-sm text-secondary/80 mb-3 line-clamp-3 leading-relaxed">{action.subtitle}</p>
       )}
 
+      {/* Per feedback_job_card_required_fields.md — JOB cards must surface location/mode/salary/easy_apply/JD link/cover letter */}
+      <JobMeta action={action} />
+
       {/* Provenance + action + who — uniform meta strip */}
       <div className="mb-4">
         <CardMeta
@@ -393,6 +396,19 @@ function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
             {action.subtitle}
           </div>
         )}
+        {action.category === 'job' && (
+          <div className="flex items-center gap-1.5 text-[10px] text-secondary mt-0.5 flex-wrap">
+            {action.location && (
+              <span className="inline-flex items-center gap-0.5"><MapPin size={9} className="text-tertiary" /> {action.location}</span>
+            )}
+            {action.salary_range && (
+              <span className="inline-flex items-center gap-0.5 text-money font-mono"><DollarSign size={9} /> {action.salary_range}</span>
+            )}
+            {action.easy_apply && (
+              <span className="inline-flex items-center gap-0.5 text-success font-mono uppercase tracking-wider"><Zap size={9} /> easy apply</span>
+            )}
+          </div>
+        )}
         <div className="mt-1 flex items-center gap-2 flex-wrap">
           <CardMeta
             source={action.source}
@@ -438,6 +454,107 @@ function FollowUpRow({ action, busy, onApprove, onReject, onMark }: CardProps) {
           <X size={14} />
         </button>
       </div>
+    </div>
+  );
+}
+
+
+interface JobMetaProps { action: NextAction }
+/**
+ * Per Philippe's brief: every JOB next-action MUST surface location, work mode,
+ * salary, easy_apply pill, posted-via source, JD link, and cover letter preview.
+ * Codified in feedback_job_card_required_fields.md.
+ */
+function JobMeta({ action }: JobMetaProps) {
+  if (action.category !== 'job') return null;
+  const flag = (loc: string | null | undefined): string => {
+    if (!loc) return '';
+    const t = loc.toLowerCase();
+    if (t.includes('switzer') || t.includes('zurich') || t.includes('zürich') || t.includes('basel') || t.includes('geneva') || t.includes('lausanne') || t.includes('bern')) return '🇨🇭';
+    if (t.includes('portug') || t.includes('lisbon') || t.includes('porto')) return '🇵🇹';
+    if (t.includes('germ') || t.includes('berlin') || t.includes('munich')) return '🇩🇪';
+    if (t.includes('united states') || t.includes('usa') || t.includes(', us') || t.includes(', new york') || t.includes(', ca')) return '🇺🇸';
+    if (t.includes('united kingdom') || t.includes(' uk') || t.includes('london') || t.includes('england')) return '🇬🇧';
+    if (t.includes('france') || t.includes('paris')) return '🇫🇷';
+    if (t.includes('netherlands') || t.includes('amsterdam')) return '🇳🇱';
+    if (t.includes('canada') || t.includes('toronto')) return '🇨🇦';
+    if (t.includes('remote')) return '🌍';
+    if (t.includes('europe') || t.includes('eu')) return '🇪🇺';
+    return '';
+  };
+  const loc = action.location ?? '';
+  const remote = loc.toLowerCase().includes('remote');
+  const hybrid = loc.toLowerCase().includes('hybrid');
+  const workMode = remote ? 'Remote' : hybrid ? 'Hybrid' : (loc ? 'On-site' : null);
+  const workTone = remote ? 'bg-success/15 text-success border-success/30' : hybrid ? 'bg-info/15 text-info border-info/30' : 'bg-warning/15 text-warning border-warning/30';
+  const jdUrl = action.source_url || action.contact_url || null;
+  return (
+    <div className="space-y-2 my-3">
+      <div className="flex items-center gap-2 flex-wrap text-xs">
+        {workMode && (
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${workTone} font-mono uppercase tracking-wider text-[10px]`}>
+            <Briefcase size={11} /> {workMode}
+          </span>
+        )}
+        {action.location && (
+          <span className="inline-flex items-center gap-1 text-secondary">
+            {flag(action.location) && <span aria-hidden className="text-base leading-none">{flag(action.location)}</span>}
+            <MapPin size={11} className="text-tertiary" />
+            <span>{action.location}</span>
+          </span>
+        )}
+        {action.salary_range && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-money/10 text-money border border-money/30 text-[11px] font-mono">
+            <DollarSign size={11} /> {action.salary_range}
+          </span>
+        )}
+        {action.job_type && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-elevated/60 text-tertiary text-[10px] font-mono uppercase tracking-wider">
+            {action.job_type}
+          </span>
+        )}
+        {action.easy_apply && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-success/15 text-success border border-success/30 text-[10px] font-mono uppercase tracking-wider">
+            <Zap size={10} /> Easy Apply
+          </span>
+        )}
+        {action.recruiter_name && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-info">
+            <span className="text-tertiary">recruiter</span> {action.recruiter_name}
+          </span>
+        )}
+      </div>
+
+      {/* Score breakdown chips when present */}
+      {action.score_breakdown && Object.keys(action.score_breakdown).length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {Object.entries(action.score_breakdown).slice(0, 8).map(([factor, points]) => (
+            <span key={factor} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent font-mono">
+              {factor}: +{points}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Cover letter preview */}
+      {action.cover_letter && (
+        <details className="group">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-secondary/60 font-mono mb-1 flex items-center gap-1 hover:text-accent transition-colors">
+            <FileText size={10} /> Cover letter (Claude — click to expand)
+          </summary>
+          <p className="text-xs text-primary leading-relaxed whitespace-pre-wrap bg-accent/5 border border-accent/15 rounded-md px-3 py-2 mt-1">
+            {action.cover_letter}
+          </p>
+        </details>
+      )}
+
+      {/* JD link (the actual job posting, separate from "Open" button) */}
+      {jdUrl && (
+        <a href={jdUrl} target="_blank" rel="noopener noreferrer"
+           className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-info bg-info/10 hover:bg-info/20 rounded-md transition-colors">
+          <Briefcase size={11} /> Read the JD <ExternalLink size={10} />
+        </a>
+      )}
     </div>
   );
 }

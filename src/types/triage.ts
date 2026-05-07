@@ -199,10 +199,27 @@ export interface NextAction {
   action_status: ActionStatus;
   priority: number | null;
   score: number | null;
+  /** Per-factor score map from Claude rubric (e.g. { remote: 20, genai: 15 }). */
+  score_breakdown: Record<string, number> | null;
+  score_label: ScoreLabel | null;
+  tags: string[] | null;
   contact_name: string | null;
   contact_url: string | null;
+  contact_email: string | null;
   draft_reply: string | null;
   cover_letter: string | null;
+  /** Tailored CV focus areas (Claude). */
+  tailored_cv_notes: string | null;
+  /** Job-card context — populated when category='job'. */
+  company: string | null;
+  role_title: string | null;
+  location: string | null;
+  salary_range: string | null;
+  job_type: string | null;
+  easy_apply: boolean | null;
+  recruiter_name: string | null;
+  source_url: string | null;
+  event_url: string | null;
   created_at: string;
   follow_up_at: string | null;
   reason: 'pending_review' | 'sla_breach' | 'engagement_due';
