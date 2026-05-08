@@ -1,0 +1,21 @@
+v3.1.4: Beeper LinkedIn drafts bridge + sync endpoint
+
+The Vercel cron can't reach Beeper Desktop directly. The architecture is:
+  [Beeper local] → [Cowork session + Beeper MCP] → [Claude scoring]
+                                                  ↘ [send_message_draft]   (writes draft INTO Beeper chat)
+                                                  ↘ [POST /api/sync/linkedin-drafts]  (mirrors to dashboard)
+
+API
+- POST /api/sync/linkedin-drafts: idempotent batch upsert keyed by chat_id (using
+  the existing source_url unique partial index). Each draft writes to triage_items
+  with source='linkedin_dm', action_type='send_message', action_payload includes
+  chat_id + message_text. Returns { inserted, updated, skipped, errors }.
+- GET /api/sync/linkedin-drafts: returns today's linkedin_dm items so the local
+  session can dedup before re-drafting.
+- POST /api/sync/linkedin-drafts/[id]/mark-drafted: flips status to approved + adds
+  'drafted-in-beeper' tag (called after send_message_draft succeeds).
+
+Skill
+- New skill linkedin-draft-sync (in skills-plugin). Documents the full workflow:
+  scan Beeper → dedup → batch Claude score+draft → send_message_draft → POST sync.
+  Includes voice rules, override list, skip rules, edge cases.

@@ -189,9 +189,9 @@ export default function SystemHealthPanel() {
   }, [rows]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Vendor API credentials — gates briefing, scoring, Easy Apply */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <VendorCard
           label="Anthropic API"
           help="Powers briefing + cron scoring + CV tailoring"
@@ -211,99 +211,100 @@ export default function SystemHealthPanel() {
       </div>
 
       {/* Header card — overall pipeline health at a glance */}
-      <div className="bg-surface border border-border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-surface border border-border/50 rounded-xl p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-              <Activity size={16} className="text-accent" />
+            <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Activity size={14} className="text-accent" />
+              </div>
               Pipeline Health
             </h3>
-            <p className="text-xs text-secondary/80 mt-0.5">
+            <p className="text-[11px] text-secondary/70 mt-1 font-mono">
               {stats.lastRunAt ? (
                 <>
-                  Last cron run {formatDistanceToNow(stats.lastRunAt, { addSuffix: true })} ·{' '}
-                  <span className="font-mono">{format(stats.lastRunAt, 'MMM d HH:mm')}</span>
+                  Last run {formatDistanceToNow(stats.lastRunAt, { addSuffix: true })} · {format(stats.lastRunAt, 'MMM d HH:mm')}
                 </>
               ) : (
                 'No cron runs recorded yet.'
               )}
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={runCron}
               disabled={running}
-              className="text-xs px-2 py-1 rounded bg-accent/10 text-accent hover:bg-accent/20 border border-accent/30 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
-              title="Trigger /api/triage/collect now (Gmail + Apify + Firecrawl + Claude)"
+              className="glow-btn text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 border border-accent/25 transition-all disabled:opacity-50 inline-flex items-center gap-1.5 font-medium"
+              title="Trigger /api/triage/collect now"
             >
-              <Play size={12} className={running ? 'animate-spin' : ''} />
-              Run cron now
+              <Play size={11} className={running ? 'animate-spin' : ''} />
+              Run cron
             </button>
             <button
               onClick={runApproved}
               disabled={running}
-              className="text-xs px-2 py-1 rounded bg-money/10 text-money hover:bg-money/20 border border-money/30 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
-              title="Mark all approved items as executed and clear their SLA timers"
+              className="text-xs px-3 py-1.5 rounded-lg bg-money/8 text-money hover:bg-money/15 border border-money/20 transition-all disabled:opacity-50 inline-flex items-center gap-1.5 font-medium"
             >
-              <CheckCircle2 size={12} />
+              <CheckCircle2 size={11} />
               Run approved
             </button>
             <a
               href="/auth/gmail"
-              className="text-xs px-2 py-1 rounded bg-warning/10 text-warning hover:bg-warning/20 border border-warning/30 transition-colors inline-flex items-center gap-1.5"
-              title="Re-authorize Gmail + Calendar OAuth (when invalid_grant)"
+              className="text-xs px-3 py-1.5 rounded-lg bg-warning/8 text-warning hover:bg-warning/15 border border-warning/20 transition-all inline-flex items-center gap-1.5 font-medium"
             >
               Re-auth Gmail
             </a>
             <button
               onClick={() => setRefreshKey((k) => k + 1)}
               disabled={loading}
-              className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary hover:bg-elevated/80 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="text-xs px-2 py-1.5 rounded-lg bg-elevated/50 text-secondary hover:text-primary transition-all disabled:opacity-50 inline-flex items-center gap-1"
               aria-label="Refresh health"
             >
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-              Refresh
+              <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-5 gap-2">
-          <HealthStat label="OK" count={stats.counts.ok} icon={<CheckCircle2 size={14} />} color="success" />
-          <HealthStat label="Error" count={stats.counts.error} icon={<XCircle size={14} />} color="danger" />
-          <HealthStat label="Skipped" count={stats.counts.skipped} icon={<PauseCircle size={14} />} color="secondary" />
-          <HealthStat label="Fallback" count={stats.counts.fallback} icon={<AlertTriangle size={14} />} color="warning" />
-          <HealthStat label="Timeout" count={stats.counts.timeout} icon={<Clock size={14} />} color="warning" />
+          <HealthStat label="OK" count={stats.counts.ok} icon={<CheckCircle2 size={13} />} color="success" />
+          <HealthStat label="Error" count={stats.counts.error} icon={<XCircle size={13} />} color="danger" />
+          <HealthStat label="Skipped" count={stats.counts.skipped} icon={<PauseCircle size={13} />} color="secondary" />
+          <HealthStat label="Fallback" count={stats.counts.fallback} icon={<AlertTriangle size={13} />} color="warning" />
+          <HealthStat label="Timeout" count={stats.counts.timeout} icon={<Clock size={13} />} color="warning" />
         </div>
       </div>
 
       {/* Per-source rows */}
       {loading && rows.length === 0 ? (
-        <div className="text-secondary text-xs py-4 text-center">Loading system health…</div>
+        <div className="text-secondary text-xs py-8 text-center font-mono">Loading system health…</div>
       ) : rows.length === 0 ? (
-        <div className="bg-surface border border-border rounded-lg p-6 text-center">
-          <p className="text-sm text-secondary">
-            No health data in the last 7 days. The cron may not have run yet, or the
-            <code className="mx-1 px-1.5 py-0.5 rounded bg-elevated font-mono text-[10px]">system_health</code>
-            table is empty.
+        <div className="bg-surface border border-border/50 rounded-xl p-8 text-center">
+          <Activity size={28} className="mx-auto text-tertiary/30 mb-3" />
+          <p className="text-sm text-secondary">No health data in the last 7 days.</p>
+          <p className="text-[11px] text-tertiary mt-1">
+            The cron may not have run yet, or the system_health table is empty.
           </p>
         </div>
       ) : (
-        <div className="grid gap-2">
-          {grouped.map(([source, sourceRows]) => (
-            <div key={source} className="bg-surface border border-border rounded-lg overflow-hidden">
-              <div className="px-3 py-2 bg-elevated/40 border-b border-border/40 flex items-center justify-between">
-                <span className="text-xs font-mono uppercase tracking-wider text-secondary">{source}</span>
-                <span className="text-[10px] text-secondary/60">
-                  {sourceRows.length} operation{sourceRows.length !== 1 ? 's' : ''}
-                </span>
+        <div className="grid gap-3">
+          {grouped.map(([source, sourceRows]) => {
+            const hasError = sourceRows.some((r) => r.status === 'error');
+            return (
+              <div key={source} className={`bg-surface border rounded-xl overflow-hidden ${hasError ? 'border-danger/25' : 'border-border/50'}`}>
+                <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasError ? 'bg-danger/5 border-danger/15' : 'bg-elevated/30 border-border/30'}`}>
+                  <span className="text-xs font-mono uppercase tracking-wider text-secondary font-semibold">{source}</span>
+                  <span className="text-[10px] text-tertiary/60 font-mono">
+                    {sourceRows.length} op{sourceRows.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="divide-y divide-border/20">
+                  {sourceRows.map((r) => (
+                    <HealthRow key={`${r.source}-${r.operation}-${r.cron_run_id}`} row={r} />
+                  ))}
+                </div>
               </div>
-              <div className="divide-y divide-border/30">
-                {sourceRows.map((r) => (
-                  <HealthRow key={`${r.source}-${r.operation}-${r.cron_run_id}`} row={r} />
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -319,18 +320,18 @@ interface HealthStatProps {
 
 function HealthStat({ label, count, icon, color }: HealthStatProps) {
   const colorMap = {
-    success: 'text-success bg-success/8',
-    danger: 'text-danger bg-danger/8',
-    warning: 'text-warning bg-warning/8',
-    secondary: 'text-secondary bg-elevated/60',
+    success: 'text-success bg-success/6 border-success/15',
+    danger: 'text-danger bg-danger/6 border-danger/15',
+    warning: 'text-warning bg-warning/6 border-warning/15',
+    secondary: 'text-secondary bg-elevated/40 border-border/30',
   } as const;
   return (
-    <div className={`rounded-md px-2 py-2 ${colorMap[color]}`}>
-      <div className="flex items-center gap-1.5">
-        {icon}
-        <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
+    <div className={`rounded-xl px-3 py-2.5 border ${colorMap[color]} stat-glow transition-all`}>
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="opacity-70">{icon}</span>
+        <span className="text-[10px] uppercase tracking-[0.1em] font-semibold">{label}</span>
       </div>
-      <p className="text-lg font-mono font-semibold mt-0.5">{count}</p>
+      <p className="text-xl font-mono font-bold count-animate">{count}</p>
     </div>
   );
 }
@@ -357,24 +358,28 @@ function VendorCard({ label, help, billingUrl, test, testing, onRetest }: Vendor
           : { border: 'border-border', text: 'text-tertiary', dot: 'bg-tertiary' };
 
   return (
-    <div className={`bg-surface border rounded-lg p-3 ${tone.border}`}>
-      <div className="flex items-start gap-2">
-        <span className={`block w-1.5 h-1.5 rounded-full mt-2 ${tone.dot} flex-shrink-0`} />
+    <div className={`surface-card bg-surface border rounded-xl p-4 ${tone.border} transition-all`}>
+      <div className="flex items-start gap-3">
+        <div className={`w-3 h-3 rounded-full mt-1 ${tone.dot} flex-shrink-0 ${status === 'ok' ? '' : status === 'no_credits' || status === 'invalid_key' ? 'status-dot-error' : ''}`} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-primary flex items-center gap-2">
+          <div className="text-sm font-bold text-primary flex items-center gap-2">
             {label}
-            <span className={`text-[10px] font-mono uppercase ${tone.text}`}>{status}</span>
+            <span className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-md ${tone.text} ${
+              status === 'ok' ? 'bg-success/8' : status === 'no_credits' ? 'bg-danger/8' : status === 'invalid_key' ? 'bg-warning/8' : 'bg-elevated/60'
+            }`}>
+              {status}
+            </span>
           </div>
-          <div className="text-[11px] text-tertiary mt-0.5">{help}</div>
+          <div className="text-[11px] text-tertiary mt-1">{help}</div>
           {test && (
-            <div className="text-[11px] text-tertiary font-mono mt-0.5 truncate">
+            <div className="text-[11px] text-tertiary/70 font-mono mt-1 truncate">
               {test.keyMasked ? `key ${test.keyMasked} (${test.keyLength} chars)` : 'no key info'}
               {test.httpStatus ? ` · HTTP ${test.httpStatus}` : ''}
             </div>
           )}
           {(status === 'no_credits' || status === 'invalid_key') && (
             <a href={billingUrl} target="_blank" rel="noopener noreferrer"
-              className={`text-[11px] underline underline-offset-2 hover:no-underline ${tone.text}`}>
+              className={`inline-block mt-1.5 text-[11px] font-medium underline underline-offset-2 decoration-current/30 hover:no-underline ${tone.text}`}>
               Open billing →
             </a>
           )}
@@ -382,7 +387,7 @@ function VendorCard({ label, help, billingUrl, test, testing, onRetest }: Vendor
         <button
           onClick={onRetest}
           disabled={testing}
-          className="text-xs px-2 py-1 rounded bg-elevated text-secondary hover:text-primary disabled:opacity-50 inline-flex items-center gap-1 flex-shrink-0"
+          className="text-xs px-2.5 py-1.5 rounded-lg bg-elevated/60 border border-border/40 text-secondary hover:text-primary hover:bg-elevated disabled:opacity-50 inline-flex items-center gap-1.5 flex-shrink-0 transition-all"
         >
           <RefreshCw size={11} className={testing ? 'animate-spin' : ''} />
           Re-test
@@ -403,32 +408,40 @@ function HealthRow({ row }: { row: SystemHealthRow }) {
   const style = statusStyle[row.status] || statusStyle.skipped;
 
   return (
-    <div className="px-3 py-2 flex items-start gap-3 hover:bg-elevated/20 transition-colors">
+    <div className="px-4 py-3 flex items-start gap-3 hover:bg-elevated/30 transition-all group">
       <div className="mt-1.5 flex-shrink-0">
-        <span className={`block w-2 h-2 rounded-full ${style.dot}`} />
+        <span className={`block w-2.5 h-2.5 rounded-full ${style.dot} ${row.status === 'error' ? 'status-dot-error' : ''}`} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-sm font-medium text-primary">{row.operation}</span>
-          <span className={`text-xs font-mono uppercase ${style.text}`}>{row.status}</span>
+          <span className="text-sm font-semibold text-primary">{row.operation}</span>
+          <span className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-md ${style.text} ${
+            row.status === 'ok' ? 'bg-success/8' : row.status === 'error' ? 'bg-danger/8' : row.status === 'fallback' || row.status === 'timeout' ? 'bg-warning/8' : 'bg-elevated/60'
+          }`}>
+            {row.status}
+          </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-secondary mt-0.5 font-mono">
-          <span>{row.items_count} items</span>
-          <span>·</span>
-          <span>{row.duration_ms}ms</span>
-          <span>·</span>
+        <div className="flex items-center gap-2 text-[11px] text-secondary/70 mt-1 font-mono">
+          <span className="bg-elevated/40 px-1.5 py-0.5 rounded">{row.items_count} items</span>
+          <span className="text-tertiary/40">·</span>
+          <span className="bg-elevated/40 px-1.5 py-0.5 rounded">{row.duration_ms}ms</span>
+          <span className="text-tertiary/40">·</span>
           <span>{formatDistanceToNow(new Date(row.created_at), { addSuffix: true })}</span>
         </div>
         {row.error_message && (
-          <p className="text-[11px] text-danger/90 mt-1 break-words font-mono leading-relaxed">
-            {row.error_message.slice(0, 220)}
-            {row.error_message.length > 220 && '…'}
-          </p>
+          <div className="mt-2 bg-danger/5 border border-danger/15 rounded-lg px-3 py-2">
+            <p className="text-[11px] text-danger/90 break-words font-mono leading-relaxed">
+              {row.error_message.slice(0, 220)}
+              {row.error_message.length > 220 && '…'}
+            </p>
+          </div>
         )}
         {row.fallback_used && (
-          <p className="text-[11px] text-warning/90 mt-1">
-            Fallback used: <span className="font-mono">{row.fallback_used}</span>
-          </p>
+          <div className="mt-2 bg-warning/5 border border-warning/15 rounded-lg px-3 py-2">
+            <p className="text-[11px] text-warning/90">
+              Fallback used: <span className="font-mono">{row.fallback_used}</span>
+            </p>
+          </div>
         )}
       </div>
     </div>

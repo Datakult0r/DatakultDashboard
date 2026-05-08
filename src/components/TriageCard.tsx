@@ -75,7 +75,7 @@ export default function TriageCard({ item }: TriageCardProps) {
   const SourceIcon = sourceIcon[normalizedSource] || ExternalLink;
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 hover:border-secondary/60 transition-all duration-200 group">
+    <div className="surface-card bg-surface border border-border/50 rounded-xl p-4 transition-all duration-200 group">
       {/* Header with source and score */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export default function TriageCard({ item }: TriageCardProps) {
               href={deepLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-accent/70 hover:text-accent transition-colors opacity-0 group-hover:opacity-100"
+              className="inline-flex items-center gap-1 text-xs text-accent/60 hover:text-accent transition-all opacity-0 group-hover:opacity-100"
               title={`Open in ${item.source}`}
             >
               <SourceIcon size={12} />
@@ -147,7 +147,7 @@ export default function TriageCard({ item }: TriageCardProps) {
           {item.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="inline-block px-2 py-0.5 rounded-sm text-xs bg-elevated text-secondary"
+              className="inline-block px-2 py-0.5 rounded-md text-[10px] font-mono bg-elevated/60 text-secondary/70 border border-border/30"
             >
               {tag}
             </span>
@@ -157,16 +157,17 @@ export default function TriageCard({ item }: TriageCardProps) {
 
       {/* Draft reply section */}
       {item.draft_reply && (
-        <div className="mt-3 pt-3 border-t border-border/50">
+        <div className="mt-3 pt-3 border-t border-border/30">
           <button
             onClick={() => setIsReplyExpanded(!isReplyExpanded)}
-            className="text-xs font-medium text-accent hover:text-accent/80 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent rounded px-1"
+            className="text-xs font-medium text-accent hover:text-accent-bright focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent rounded-md px-1.5 py-0.5 inline-flex items-center gap-1 transition-all"
           >
+            <span className={`text-[10px] transition-transform ${isReplyExpanded ? 'rotate-90' : ''}`}>›</span>
             {isReplyExpanded ? 'Hide' : 'Show'} draft reply
           </button>
 
           {isReplyExpanded && (
-            <div className="mt-2 bg-elevated/80 rounded border border-border/40 p-3 text-xs text-secondary/90 whitespace-pre-wrap break-words font-mono max-h-40 overflow-y-auto leading-relaxed">
+            <div className="mt-2 bg-elevated/50 rounded-lg border border-border/30 p-3 text-xs text-secondary/90 whitespace-pre-wrap break-words font-mono max-h-40 overflow-y-auto leading-relaxed">
               {item.draft_reply}
             </div>
           )}
@@ -174,16 +175,16 @@ export default function TriageCard({ item }: TriageCardProps) {
           {isReplyExpanded && (
             <button
               onClick={handleCopyReply}
-              className="mt-2 flex items-center gap-1 px-2 py-1 text-xs bg-accent/10 text-accent hover:bg-accent/20 rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent transition-colors"
+              className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/8 text-accent hover:bg-accent/15 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent transition-all"
             >
               {isCopied ? (
                 <>
-                  <Check size={14} />
+                  <Check size={12} />
                   Copied!
                 </>
               ) : (
                 <>
-                  <Copy size={14} />
+                  <Copy size={12} />
                   Copy reply
                 </>
               )}
@@ -194,32 +195,32 @@ export default function TriageCard({ item }: TriageCardProps) {
 
       {/* Footer actions */}
       {(deepLink || promotable) && (
-        <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
+        <div className="mt-3 pt-3 border-t border-border/30 flex items-center gap-2">
           {deepLink && !item.draft_reply && (
             <a
               href={deepLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent/10 text-accent rounded hover:bg-accent/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent/8 text-accent rounded-lg hover:bg-accent/15 transition-all"
             >
-              <SourceIcon size={14} />
+              <SourceIcon size={13} />
               Open in {item.source}
-              <ExternalLink size={10} />
+              <ExternalLink size={9} />
             </a>
           )}
           {promotable && (
             <button
               onClick={handlePromote}
               disabled={promoting || promoted}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ml-auto ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ml-auto ${
                 promoted
                   ? 'bg-success/10 text-success'
-                  : 'bg-money/10 text-money hover:bg-money/20'
+                  : 'bg-money/8 text-money hover:bg-money/15'
               } disabled:opacity-50`}
               title="Create a customer engagement from this item"
             >
-              {promoted ? <Check size={14} /> : <Target size={14} />}
-              {promoted ? 'Promoted' : 'Promote to engagement'}
+              {promoted ? <Check size={13} /> : <Target size={13} />}
+              {promoted ? 'Promoted' : 'Promote'}
             </button>
           )}
         </div>

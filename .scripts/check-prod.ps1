@@ -28,5 +28,6 @@ function Invoke-Endpoint($path) {
   Write-Host ''
 }
 
-Invoke-Endpoint '/api/health/env'
-Invoke-Endpoint '/api/triage/collect'
+Invoke-Endpoint '/api/anthropic/test'
+Invoke-Endpoint '/api/browser-use/test'
+Invoke-Endpoint '/api/nudges'
