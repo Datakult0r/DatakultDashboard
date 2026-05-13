@@ -3,6 +3,20 @@
 > **Single source of truth: `triage_items`** with `action_type IN ('apply_job_easy', 'apply_job_website')`.
 > `philippe_jobs` is legacy fallback only — kept for backward compatibility with the bumps-discovery cron.
 
+## ⛔ Anti-detection — sanctioned controllers only
+
+Only **two** browser controllers are sanctioned anywhere in this pipeline:
+
+1. **Browser Use Cloud v3** — for server-side automation (Vercel cron, `/api/actions/apply`, `/api/jobs/auto-apply`, `/api/jobs/easy-apply`). Wraps stealth + fingerprint hygiene we pay for.
+2. **computer-use** — for desktop-driven sessions where Philippe is at the keyboard (NOT used by this cron — cron has no desktop).
+
+**Forbidden** (do not propose, scaffold, wire, or hint at):
+Playwright (any variant), Puppeteer, Selenium, undetected-chromedriver, rebrowser-* patches, any self-hosted Chromium that touches a logged-in LinkedIn / job-board session. Not as primary. Not as fallback. Not as experiment.
+
+LinkedIn's bot detection probes IP fingerprints, storageState replay anomalies, and CDP runtime signatures faster than any open-source patch can keep up. `linkedin.com/in/pkfde` is the company's #1 asset and the rule is non-negotiable.
+
+The anti-detection envelope (cap, randomized delays, halt-on-failure, 24h cool-off) is also non-negotiable — do not lower any value without re-reading `feedback_no_playwright.md` and `feedback_linkedin_protocol.md`.
+
 ## State machine
 
 ```

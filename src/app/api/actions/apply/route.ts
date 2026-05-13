@@ -8,6 +8,11 @@ import type { ActionPayload } from '@/types/triage';
  * Execute job apply via Browser Use Cloud for approved triage_items.
  * Body: { ids: string[] } — array of triage item IDs to apply for
  *
+ * ANTI-DETECTION: Only Browser Use Cloud v3 is sanctioned for this server-side
+ * flow. Do NOT swap in Playwright / Puppeteer / Selenium / self-hosted Chromium
+ * as a primary or fallback — Philippe's LinkedIn account is #1 asset, and the
+ * stealth hygiene we pay Browser Use for is the moat. See feedback_no_playwright.md.
+ *
  * Accepts BOTH action_type='apply_job_easy' AND action_type='apply_job_website'.
  *   - apply_job_easy   → executeEasyApply   (LinkedIn Easy Apply instructions)
  *   - apply_job_website → executeWebsiteApply (generic ATS form instructions)

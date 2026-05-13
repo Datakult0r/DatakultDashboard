@@ -2,6 +2,22 @@
  * GET /api/jobs/auto-apply   (Vercel cron, 09:00 UTC daily — see vercel.json)
  *
  * ────────────────────────────────────────────────────────────────────────────
+ * ANTI-DETECTION (read this before adding any new code path):
+ *
+ *   Only TWO browser controllers are sanctioned for this pipeline:
+ *     1. Browser Use Cloud v3 (server-side, via executeEasyApply / executeWebsiteApply)
+ *     2. computer-use         (desktop-only, NOT used here — cron has no desktop)
+ *
+ *   DO NOT introduce Playwright, Puppeteer, Selenium, undetected-chromedriver,
+ *   rebrowser-* patches, or any self-hosted Chromium. Not as primary, fallback,
+ *   or experiment. LinkedIn's bot detection actively probes IP fingerprints,
+ *   storageState replay anomalies, and CDP runtime signatures faster than any
+ *   open-source patch can keep up. linkedin.com/in/pkfde is Philippe's #1
+ *   asset and not negotiable. See memory: feedback_no_playwright.md.
+ *
+ *   The anti-detection envelope below (cap, randomized delays, halt-on-failure,
+ *   24h cool-off) is ALSO non-negotiable. Do not lower any of these values.
+ * ────────────────────────────────────────────────────────────────────────────
  * DATA-SOURCE PRIORITY (read this before changing anything):
  *
  *   PRIMARY:   triage_items where action_status='approved'
