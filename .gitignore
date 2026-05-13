@@ -41,3 +41,12 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# OAuth scratch (do NOT commit)
+.personal-refresh-token.txt
+.oauth-stdout.log
+.oauth-stderr.log
+.oauth-out.log
+.oauth-err.log
+.oauth-listener-personal.py
+
