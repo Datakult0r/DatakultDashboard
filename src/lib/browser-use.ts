@@ -149,3 +149,122 @@ export async function executeEasyApply(tasks: BrowserUseTask[]): Promise<EasyApp
     authOk: true,
   };
 }
+
+/**
+ * Submit one website (non-LinkedIn-EasyApply) job application via Browser Use.
+ * Used for jobs where the apply flow is the company's own ATS form (Greenhouse, Lever, Workday, custom).
+ * Instructions are deliberately generic — no "Click Easy Apply" assumption.
+ */
+async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise<BrowserUseResult> {
+  const instructions = [
+    `Navigate to ${task.jobUrl}`,
+    'Wait 2-4 seconds (randomized).',
+    'Find and click the apply button (commonly labeled "Apply", "Apply Now", "Apply for this job", or similar).',
+    'If the application opens in a new tab, switch to it.',
+    'Wait for the application form to load.',
+    'Fill in standard fields with these values:',
+    '  Full Name: Philippe Küng',
+    '  First Name: Philippe',
+    '  Last Name: Küng',
+    '  Email: philippe.kung@clinicofai.com',
+    '  Phone: +351 933 607 511',
+    '  Location: Lisbon, Portugal',
+    '  LinkedIn: https://www.linkedin.com/in/pkfde',
+    '  Website: https://www.clinicofai.com',
+    '  Work Authorization: EU citizen (Swiss/German passports), no visa needed for EU',
+    '  Years of AI/ML experience: 6+ total, 5+ GenAI/LLMs',
+    '  Salary expectation: EUR 90-130k FTE / EUR 80-150/hr contract',
+    '  Notice period / Availability: Immediate (within 1 week)',
+    '  Timezone: UTC+1 Lisbon, flexible ±3 hours',
+    '  Remote: Yes',
+    task.coverLetter ? `If asked for cover letter / "Why are you a good fit": ${task.coverLetter.slice(0, 1200)}` : '',
+    'If a CV / resume upload is required, look for an existing uploaded resume on the page (LinkedIn auto-fill, prior session). If not available, SKIP this job — do not submit incomplete.',
+    'Do NOT invent answers to questions you cannot map to the values above. If a required question is unanswerable, SKIP and return "skipped_required_field" with the field name.',
+    'Submit only when all required fields are filled. Return the confirmation message verbatim.',
+  ].filter(Boolean).join('\n');
+
+  try {
+    const r = await fetch(`${BU_BASE}/sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        [BU_HEADER]: apiKey,
+      },
+      body: JSON.stringify({
+        task: instructions,
+        title: `Website Apply · ${task.company}`,
+      }),
+    });
+
+    if (r.status === 401 || r.status === 403) {
+      return { taskId: '', status: 'unauthorized', message: 'Browser Use API key rejected', jobUrl: task.jobUrl };
+    }
+    if (r.status === 402 || r.status === 429) {
+      const detail = (await r.text()).slice(0, 200);
+      return { taskId: '', status: 'no_credits', message: `Browser Use throttled / out of credits: ${detail}`, jobUrl: task.jobUrl };
+    }
+    if (!r.ok) {
+      const detail = (await r.text()).slice(0, 300);
+      return { taskId: '', status: 'failed', message: `${r.status}: ${detail}`, jobUrl: task.jobUrl };
+    }
+    const data = await r.json();
+    return {
+      taskId: String(data.id ?? data.session_id ?? ''),
+      status: 'queued',
+      message: `Website Apply queued for ${task.company} — ${task.jobTitle}`,
+      jobUrl: task.jobUrl,
+    };
+  } catch (err) {
+    return { taskId: '', status: 'failed', message: err instanceof Error ? err.message : String(err), jobUrl: task.jobUrl };
+  }
+}
+
+/**
+ * Execute Website Apply for approved jobs. Same anti-detection envelope as Easy Apply
+ * (verify auth once, cap at 5, 30-90s randomized waits) but generic instructions.
+ */
+export async function executeWebsiteApply(tasks: BrowserUseTask[]): Promise<EasyApplyResult> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey) {
+    return {
+      results: tasks.map((t) => ({
+        taskId: '', status: 'unauthorized' as const,
+        message: 'BROWSER_USE_API_KEY not configured', jobUrl: t.jobUrl,
+      })),
+      durationMs: 0,
+      error: 'BROWSER_USE_API_KEY not set',
+      authOk: false,
+    };
+  }
+
+  const startTime = Date.now();
+  const auth = await verifyAuth(apiKey);
+  if (!auth.ok) {
+    return {
+      results: tasks.map((t) => ({
+        taskId: '', status: 'unauthorized' as const,
+        message: `Browser Use auth failed (${auth.status}): ${auth.detail ?? ''}`,
+        jobUrl: t.jobUrl,
+      })),
+      durationMs: Date.now() - startTime,
+      error: `Auth ${auth.status}: ${auth.detail ?? ''}`,
+      authOk: false,
+    };
+  }
+
+  const limited = tasks.slice(0, 5);
+  const results: BrowserUseResult[] = [];
+  for (let i = 0; i < limited.length; i++) {
+    results.push(await submitWebsiteApply(apiKey, limited[i]));
+    if (i < limited.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 30000 + Math.random() * 60000));
+    }
+  }
+
+  return {
+    results,
+    durationMs: Date.now() - startTime,
+    error: null,
+    authOk: true,
+  };
+}
