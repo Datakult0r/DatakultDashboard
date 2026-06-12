@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Shield, CheckCheck, Filter } from 'lucide-react';
+import { Shield, CheckCheck, Filter, Zap } from 'lucide-react';
 import type { TriageItem } from '@/types/triage';
 import ActionCard from './ActionCard';
 
@@ -23,6 +23,7 @@ type QueueFilter = 'pending' | 'approved' | 'rejected' | 'all';
  */
 export default function ApprovalQueue({ items, onApprove, onReject }: ApprovalQueueProps) {
   const [filter, setFilter] = useState<QueueFilter>('pending');
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const pendingItems = items.filter((i) => i.action_status === 'pending_review');
   const approvedItems = items.filter((i) => i.action_status === 'approved' || i.action_status === 'executing' || i.action_status === 'executed');
@@ -66,6 +67,25 @@ export default function ApprovalQueue({ items, onApprove, onReject }: ApprovalQu
               <CheckCheck size={14} />
               <span className="text-xs">{approvedItems.length} approved</span>
             </div>
+          )}
+          {pendingItems.filter((i) => (i.priority || 0) >= 8 || (i.score || 0) >= 75).length > 1 && (
+            <button
+              disabled={bulkBusy}
+              onClick={async () => {
+                const targets = pendingItems.filter((i) => (i.priority || 0) >= 8 || (i.score || 0) >= 75);
+                if (!confirm(`Approve ${targets.length} top items (P8+ / score 75+)? Agents will start applying in the next window.`)) return;
+                setBulkBusy(true);
+                try {
+                  for (const t of targets) await onApprove(t.id);
+                } finally {
+                  setBulkBusy(false);
+                }
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-success/10 text-success hover:bg-success/20 border border-success/25 disabled:opacity-50"
+            >
+              <Zap size={12} />
+              {bulkBusy ? 'Approving…' : `Approve all top (${pendingItems.filter((i) => (i.priority || 0) >= 8 || (i.score || 0) >= 75).length})`}
+            </button>
           )}
         </div>
 
