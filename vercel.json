@@ -2,7 +2,19 @@
   "crons": [
     {
       "path": "/api/triage/collect",
-      "schedule": "0 9 * * *"
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/actions/execute",
+      "schedule": "23 9 * * *"
+    },
+    {
+      "path": "/api/actions/execute",
+      "schedule": "47 13 * * *"
+    },
+    {
+      "path": "/api/actions/execute",
+      "schedule": "11 17 * * *"
     }
   ]
 }

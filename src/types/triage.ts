@@ -46,6 +46,12 @@ export interface ActionPayload {
   email_subject?: string;
   /** Email draft body */
   email_body?: string;
+  /** Browser Use v3 session id (set when execution starts) */
+  browser_use_session_id?: string;
+  /** Live view URL to watch the agent apply in real time */
+  browser_use_live_url?: string;
+  /** ISO timestamp when execution started (timeout tracking) */
+  execution_started_at?: string;
   /** Any additional context */
   [key: string]: string | undefined;
 }
