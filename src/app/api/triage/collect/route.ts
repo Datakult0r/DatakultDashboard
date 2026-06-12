@@ -242,9 +242,37 @@ export async function GET(request: NextRequest) {
         await logHealth(runId, 'apify', 'discover_jobs', 'ok', apifyResult.items.length, apifyResult.durationMs);
       }
 
-      if (apifyResult.items.length > 0) {
+      // ── Cross-run dedup: drop jobs already in the system (saves Claude tokens
+      // and stops the same role resurfacing in triage every morning) ──
+      let freshJobs = apifyResult.items;
+      try {
+        const urls = apifyResult.items.map((j) => j.jobUrl).filter(Boolean);
+        if (urls.length > 0) {
+          const { data: existing } = await supabaseServer
+            .from('triage_items')
+            .select('source_url')
+            .in('source_url', urls);
+          const { data: existingPJ } = await supabaseServer
+            .from('philippe_jobs')
+            .select('job_url')
+            .in('job_url', urls);
+          const seen = new Set([
+            ...(existing || []).map((r) => r.source_url),
+            ...(existingPJ || []).map((r) => r.job_url),
+          ]);
+          freshJobs = apifyResult.items.filter((j) => !seen.has(j.jobUrl));
+          if (freshJobs.length < apifyResult.items.length) {
+            await logHealth(runId, 'apify', 'dedup_existing', 'ok',
+              apifyResult.items.length - freshJobs.length, 0);
+          }
+        }
+      } catch {
+        // dedup is best-effort — never block scoring
+      }
+
+      if (freshJobs.length > 0) {
         // Score all discovered jobs
-        const scoringResult = await scoreJobs(apifyResult.items);
+        const scoringResult = await scoreJobs(freshJobs);
         results.jobs.scored = scoringResult.scored.length;
         results.jobs.strong = scoringResult.scored.filter((s) => s.scoreLabel === 'strong').length;
         results.jobs.coverLetters = scoringResult.scored.filter((s) => s.coverLetter).length;
@@ -275,7 +303,11 @@ export async function GET(request: NextRequest) {
             contact_url: s.job.applyUrl || s.job.jobUrl,
             cover_letter: s.coverLetter,
             triage_date: today,
-            action_type: s.score >= 65 ? 'apply_job_website' as const : null,
+            action_type: s.score >= 65
+              ? (s.job.easyApply && process.env.ENABLE_EASY_APPLY === 'true'
+                  ? 'apply_job_easy' as const
+                  : 'apply_job_website' as const)
+              : null,
             action_payload: s.score >= 65
               ? { job_url: s.job.jobUrl, company_career_url: s.job.applyUrl || '' }
               : {},
@@ -521,7 +553,7 @@ export async function GET(request: NextRequest) {
         .eq('triage_date', today)
         .eq('category', 'job')
         .eq('score_label', 'strong')
-        .is('action_status', 'pending_review');
+        .eq('action_status', 'pending_review');
 
       if (strongJobs && strongJobs.length > 0) {
         for (const job of strongJobs.slice(0, 5)) { // Max 5 career page lookups

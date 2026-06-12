@@ -33,10 +33,12 @@ const SEARCH_QUERIES = [
   'head of AI remote',
   'GenAI engineer contract remote',
   'agentic AI remote',
+  'AI consultant Switzerland remote',
+  'KI Berater remote',
 ];
 
-/** Locations to search */
-const SEARCH_LOCATIONS = ['Europe', 'Remote'];
+/** Locations to search — DACH first (Philippe's network + comp levels), then EU-remote */
+const SEARCH_LOCATIONS = ['Switzerland', 'Germany', 'Austria', 'Europe', 'Remote'];
 
 /**
  * Run an Apify actor and wait for results.

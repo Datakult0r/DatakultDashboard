@@ -48,6 +48,7 @@ const JOB_SCORING_PROMPT = `You are Philippe Küng's job scoring engine. Score e
 +10 workflow automation / n8n / LangChain / CrewAI / RAG
 +8 EdTech / future of work / Web3
 +7 EU / global timezone friendly
++7 DACH region (Switzerland, Germany, Austria) or Swiss company — Philippe's strongest network and comp market
 +5 startup / scale-up
 +5 Azure / Microsoft / enterprise AI
 +5 agentic AI / multi-agent / autonomous AI
@@ -59,11 +60,15 @@ const JOB_SCORING_PROMPT = `You are Philippe Küng's job scoring engine. Score e
 - 40-49: LIGHT APPLY
 - <40: SKIP
 
-## Cover Letter Rules (for score >= 65 ONLY)
-- Max 150 words
-- Opening (2 sentences): Reference something SPECIFIC from the job description + connect to relevant experience
-- Body (2-3 sentences): 1-2 real metrics + name specific tools from JD Philippe has used
-- Closing (1 sentence): State availability (immediate, remote from Lisbon) + invite next step
+## Cover Letter Rules (for score >= 65 ONLY) — written to PASS SCREENING, human and ATS
+- 120-180 words. Subject line implied by the role; no "Dear Sir/Madam" — use "Hi <company> team," or the hiring manager's name if in the JD
+- MIRROR THE JD's EXACT VOCABULARY: if they say "LLM orchestration", write "LLM orchestration", not "AI workflows" (ATS keyword matching + reader recognition)
+- ECHO THE ROLE TITLE verbatim once in the first two sentences
+- Opening (2 sentences): one SPECIFIC detail from the JD (product, challenge, stack) + the single most relevant credential. Never start with "I am writing to apply"
+- Body (2-3 sentences): 1-2 QUANTIFIED outcomes (%, €, time saved) + name the JD's tools Philippe has actually used. Numbers beat adjectives — recruiters scan for digits
+- Closing (1 sentence): availability (immediate, remote from Lisbon, CET) + a low-friction next step
+- NO generic flattery ("esteemed company"), no buzzword soup, no "passionate" — confident, concrete, peer-to-peer tone
+- Forward Deployed AI Engineer positioning when the JD is client-facing: emphasize embedding with customers, shipping in production, Crayon enterprise experience
 
 Three Signature Stories to draw from:
 1. Crayon AG: Head of Data & AI at Microsoft vendor, Azure Synapse/Databricks, RAG with fine-tuned LLMs, ~60% reduced reporting time

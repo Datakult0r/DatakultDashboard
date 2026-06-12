@@ -242,4 +242,147 @@ export async function stopSession(sessionId: string): Promise<boolean> {
   }
 }
 
+
+/**
+ * WEBSITE APPLICATIONS — fill-then-hold pattern.
+ *
+ * LinkedIn is only used for Easy Apply. Everything else goes to the company's
+ * own career page, where a CHEAPER agent (BROWSER_USE_WEBSITE_MODEL, default
+ * gemini flash-class — no LinkedIn risk, so no need for the premium model)
+ * fills the entire application: personal data, CV, cover letter, screening
+ * questions answered from APPLICANT FACTS.
+ *
+ * It then STOPS at the final submit button and keeps the session alive
+ * (keepAlive). Philippe reviews via liveUrl and clicks "Send" on the dashboard,
+ * which dispatches a follow-up task to the SAME session to click submit.
+ * Human stays in the loop exactly once — at the moment that matters.
+ */
+
+interface WebsiteApplyTask {
+  careerUrl: string;
+  jobTitle: string;
+  company: string;
+  coverLetter: string | null;
+  cvNotes: string | null;
+}
+
+function buildWebsiteFillInstructions(task: WebsiteApplyTask): string {
+  const cvUrl = process.env.CV_PUBLIC_URL || '';
+  return `
+You are filling out a job application on a company career site on behalf of Philippe Küng. Work carefully and human-paced.
+
+1. Open ${task.careerUrl}
+2. If this is a job listing, find and click the Apply button. If it is a careers overview page, search for the role "${task.jobTitle}" and open it. If the role cannot be found, finish with submitted=false, reason="job_not_found".
+3. If the form requires creating an account or logging in, finish with submitted=false, reason="needs_account".
+4. Fill every field using the APPLICANT FACTS below.
+${cvUrl ? `5. If a CV/resume upload is required, the CV file is available at: ${cvUrl} — download it and upload it to the form.` : '5. If a CV/resume upload is REQUIRED and cannot be skipped, finish with submitted=false, reason="needs_cv_upload".'}
+${task.coverLetter ? `6. If there is a cover letter / motivation field, use this text:\n"""${task.coverLetter.slice(0, 900)}"""` : '6. Skip optional cover letter fields.'}
+${task.cvNotes ? `7. Extra positioning for this role (use to answer "why us" / experience questions):\n${task.cvNotes.slice(0, 600)}` : ''}
+8. For REQUIRED questions not covered by the facts (salary expectations, visa details you do not have), DO NOT GUESS: finish with submitted=false, reason="needs_human", listing them in unanswered_questions.
+9. Proceed until you reach the FINAL review/submit step. DO NOT CLICK THE FINAL SUBMIT BUTTON.
+10. Finish with submitted=false, reason="ready_to_send" — a human will review and trigger submission.
+
+${applicantFacts()}
+
+Job: ${task.jobTitle} at ${task.company}
+`.trim();
+}
+
+/** Create a website-application fill session (stops before submit, stays alive). */
+export async function createWebsiteApplySession(task: WebsiteApplyTask): Promise<SessionCreateResult> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey) {
+    return { sessionId: '', liveUrl: null, status: 'not_configured', message: 'BROWSER_USE_API_KEY not set' };
+  }
+  if (!task.careerUrl) {
+    return { sessionId: '', liveUrl: null, status: 'failed', message: 'No career page URL on this item' };
+  }
+
+  try {
+    const response = await fetch(`${BASE_URL}/sessions`, {
+      method: 'POST',
+      headers: apiHeaders(apiKey),
+      body: JSON.stringify({
+        task: buildWebsiteFillInstructions(task),
+        model: process.env.BROWSER_USE_WEBSITE_MODEL || undefined, // cheap model — no LinkedIn risk here
+        keepAlive: true, // hold the session so "Send" can be dispatched to it later
+        proxyCountryCode: 'pt',
+        maxCostUsd: Number(process.env.BROWSER_USE_WEBSITE_MAX_COST_USD || 0.75),
+        outputSchema: {
+          type: 'object',
+          properties: {
+            submitted: { type: 'boolean' },
+            reason: { type: 'string' },
+            unanswered_questions: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['submitted', 'reason'],
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      const status = response.status === 402 ? 'no_credits' as const : 'failed' as const;
+      return { sessionId: '', liveUrl: null, status, message: `API ${response.status}: ${error.slice(0, 200)}` };
+    }
+
+    const data = await response.json();
+    return {
+      sessionId: String(data.id || data.sessionId || ''),
+      liveUrl: data.liveUrl ? String(data.liveUrl) : null,
+      status: 'queued',
+      message: `Website fill started for ${task.company} — ${task.jobTitle}`,
+    };
+  } catch (err) {
+    return { sessionId: '', liveUrl: null, status: 'failed', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Dispatch a follow-up task to an existing (idle, keepAlive) session.
+ * Used for the final "click submit" after Philippe reviews a filled application.
+ */
+export async function dispatchFollowUp(sessionId: string, instruction: string): Promise<SessionCreateResult> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey) {
+    return { sessionId, liveUrl: null, status: 'not_configured', message: 'BROWSER_USE_API_KEY not set' };
+  }
+
+  try {
+    const response = await fetch(`${BASE_URL}/sessions`, {
+      method: 'POST',
+      headers: apiHeaders(apiKey),
+      body: JSON.stringify({
+        sessionId,
+        task: instruction,
+        outputSchema: {
+          type: 'object',
+          properties: {
+            submitted: { type: 'boolean' },
+            reason: { type: 'string' },
+          },
+          required: ['submitted', 'reason'],
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return { sessionId, liveUrl: null, status: 'failed', message: `API ${response.status}: ${error.slice(0, 200)}` };
+    }
+
+    const data = await response.json();
+    return {
+      sessionId: String(data.id || data.sessionId || sessionId),
+      liveUrl: data.liveUrl ? String(data.liveUrl) : null,
+      status: 'queued',
+      message: 'Submit dispatched',
+    };
+  } catch (err) {
+    return { sessionId, liveUrl: null, status: 'failed', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type { WebsiteApplyTask };
+
 export type { BrowserUseTask, SessionCreateResult, SessionStatusResult, EasyApplyOutput };
