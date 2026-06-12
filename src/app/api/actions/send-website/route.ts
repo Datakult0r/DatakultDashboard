@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
-import { dispatchFollowUp, getSessionStatus, stopSession } from '@/lib/browser-use';
+import { dispatchFollowUp, getSessionStatus, stopSession, createWebsiteApplySession } from '@/lib/browser-use';
 
 /**
  * POST /api/actions/send-website
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const payload = (item.action_payload || {}) as Record<string, string | undefined>;
     const sessionId = payload.browser_use_session_id;
 
-    if (!sessionId || payload.ready_to_send !== 'true') {
+    if (!sessionId || !['true', 'expired'].includes(payload.ready_to_send || '')) {
       return NextResponse.json({ error: 'Item is not in ready-to-send state' }, { status: 400 });
     }
 
@@ -39,8 +39,28 @@ export async function POST(request: NextRequest) {
       'The job application form on the current page is fully filled and at the final review/submit step. Click the final Submit/Send application button now, wait for the confirmation page or message, and finish with submitted=true. If submission fails or an error appears, finish with submitted=false and describe it in reason.'
     );
 
+    let activeSessionId = dispatch.sessionId;
     if (dispatch.status !== 'queued') {
-      return NextResponse.json({ error: dispatch.message }, { status: 502 });
+      // Held session likely expired. Philippe already clicked Send, so consent
+      // is explicit: start a fresh session that fills AND submits in one go.
+      const refill = await createWebsiteApplySession({
+        careerUrl: payload.company_career_url || item.contact_url || '',
+        jobTitle: item.role_title || item.title || '',
+        company: item.company || '',
+        coverLetter: item.cover_letter || null,
+        cvNotes: item.tailored_cv_notes || null,
+      });
+      if (refill.status !== 'queued') {
+        return NextResponse.json({ error: `Held session expired and refill failed: ${refill.message}` }, { status: 502 });
+      }
+      // Override the hold instruction: this run should submit at the end.
+      await dispatchFollowUp(refill.sessionId,
+        'Continue the application you are filling. When you reach the final review/submit step, CLICK SUBMIT (the human already approved sending), wait for confirmation, and finish with submitted=true.');
+      activeSessionId = refill.sessionId;
+      await supabaseServer.from('triage_items').update({
+        action_payload: { ...payload, browser_use_session_id: refill.sessionId, browser_use_live_url: refill.liveUrl || '' },
+        updated_at: new Date().toISOString(),
+      }).eq('id', id);
     }
 
     await supabaseServer.from('triage_items').update({
@@ -53,7 +73,7 @@ export async function POST(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0];
     for (let i = 0; i < 24; i++) {
       await new Promise((r) => setTimeout(r, 5000));
-      const session = await getSessionStatus(dispatch.sessionId);
+      const session = await getSessionStatus(activeSessionId);
       if (!session.done && session.status !== 'idle') continue;
 
       if (session.submitted) {
@@ -82,7 +102,7 @@ export async function POST(request: NextRequest) {
           score_label: item.score_label || null,
         });
 
-        await stopSession(dispatch.sessionId); // flush profile + free the session
+        await stopSession(activeSessionId); // flush + free the session
         return NextResponse.json({ success: true, submitted: true });
       }
 

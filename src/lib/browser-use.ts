@@ -112,6 +112,7 @@ function buildTaskInstructions(task: BrowserUseTask): string {
   return `
 You are applying to a job on LinkedIn on behalf of Philippe Küng. You are already logged in (persistent profile). Behave like a careful human: scroll naturally, brief pauses between actions, no rapid-fire clicking.
 
+0. If at ANY point you see a login page, captcha, or security checkpoint: DO NOT attempt to log in or solve it. Finish immediately with submitted=false, reason="logged_out".
 1. Open ${task.jobUrl}
 2. Read the job description: scroll down slowly through it (3-5 seconds), then back up.
 3. Click "Easy Apply". If there is no Easy Apply button, finish with submitted=false, reason="no_easy_apply_button".
@@ -398,7 +399,7 @@ export async function createDmSweepSession(): Promise<SessionCreateResult> {
   }
 
   const task = `
-You manage LinkedIn messages for Philippe Küng (Head of AI / Founder, Clinic of AI, based in Lisbon). You are logged in. Open https://www.linkedin.com/messaging/ and process UNREAD conversations only, at a calm human pace. Maximum ${process.env.DM_SWEEP_MAX_REPLIES || 8} replies this session.
+You manage LinkedIn messages for Philippe Küng (Head of AI / Founder, Clinic of AI, based in Lisbon). You are logged in. If you see a login page, captcha, or security checkpoint: DO NOT log in or solve it — finish immediately reporting logged_out. Open https://www.linkedin.com/messaging/ and process UNREAD conversations only, at a calm human pace. Maximum ${process.env.DM_SWEEP_MAX_REPLIES || 8} replies this session.
 
 For each unread conversation, classify and act:
 1. RECRUITER / JOB OPPORTUNITY (role offer, "are you open to...", interview request):

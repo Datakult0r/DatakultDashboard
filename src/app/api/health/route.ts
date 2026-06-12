@@ -9,7 +9,7 @@ import { supabaseServer } from '@/lib/supabase-server';
  * - execution pacing: applies today vs cap, in-flight sessions
  * - queue depths: pending approval, ready to send, your manual queue
  */
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {

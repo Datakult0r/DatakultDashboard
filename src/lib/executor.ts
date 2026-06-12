@@ -135,6 +135,26 @@ export async function finalizeExecuting(): Promise<{ executed: number; failed: n
     }
   }
 
+  // Expire fill-then-hold items older than 20h: the held browser session is
+  // long dead — push them to the manual queue with materials intact instead of
+  // letting a dead "Send" button rot in the UI.
+  const twentyHoursAgo = new Date(Date.now() - 20 * 3600000).toISOString();
+  const { data: staleReady } = await supabaseServer
+    .from('triage_items')
+    .select('id, action_payload, notes')
+    .eq('action_status', 'approved')
+    .eq('action_type', 'apply_job_website')
+    .lt('updated_at', twentyHoursAgo);
+  for (const stale of staleReady || []) {
+    const p = (stale.action_payload || {}) as ActionPayload;
+    if (p.ready_to_send !== 'true') continue;
+    await supabaseServer.from('triage_items').update({
+      action_payload: { ...p, ready_to_send: 'expired' },
+      notes: 'Held session expired — click Send to re-fill and submit automatically, or apply manually.',
+      updated_at: new Date().toISOString(),
+    }).eq('id', stale.id);
+  }
+
   return out;
 }
 
@@ -300,7 +320,7 @@ export async function followUps(): Promise<{ followupsDrafted: number; ghosted: 
     .from('job_applications')
     .select('*')
     .in('status', ['applied', 'screening'])
-    .lte('last_activity_date', daysAgo(7));
+    .or(`last_activity_date.lte.${daysAgo(7)},and(last_activity_date.is.null,applied_date.lte.${daysAgo(7)})`);
 
   for (const app of active || []) {
     // Ghost: 21+ days of total silence
