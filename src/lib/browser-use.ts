@@ -383,6 +383,102 @@ export async function dispatchFollowUp(sessionId: string, instruction: string): 
   }
 }
 
+
+/**
+ * LINKEDIN DM SWEEP — no opportunity dies in the inbox.
+ * Once a day the persistent profile opens LinkedIn messaging and ANSWERS
+ * recruiter/opportunity DMs directly (Philippe's instruction: straight answer,
+ * no draft). Every reply is reported back and logged to the dashboard.
+ */
+export async function createDmSweepSession(): Promise<SessionCreateResult> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  const profileId = process.env.BROWSER_USE_PROFILE_ID;
+  if (!apiKey || !profileId) {
+    return { sessionId: '', liveUrl: null, status: 'not_configured', message: 'BROWSER_USE_API_KEY / BROWSER_USE_PROFILE_ID not set' };
+  }
+
+  const task = `
+You manage LinkedIn messages for Philippe Küng (Head of AI / Founder, Clinic of AI, based in Lisbon). You are logged in. Open https://www.linkedin.com/messaging/ and process UNREAD conversations only, at a calm human pace. Maximum ${process.env.DM_SWEEP_MAX_REPLIES || 8} replies this session.
+
+For each unread conversation, classify and act:
+1. RECRUITER / JOB OPPORTUNITY (role offer, "are you open to...", interview request):
+   Reply directly in Philippe's voice — warm, confident, concise (2-4 sentences):
+   - If the role sounds senior, AI-related, remote or DACH/EU: express interest, ask for the JD and compensation range if not given, and propose a call: https://cal.read.ai/philippe-datakult/30-min
+   - If clearly off-profile (junior, on-site outside EU, non-AI): politely decline in one or two sentences, leave the door open.
+   Sign casually as Philippe.
+2. WARM NETWORK MESSAGE (former colleague, event contact): brief friendly reply; propose the booking link only if they want to talk business.
+3. SPAM / mass outreach with no fit: do not reply, mark as read.
+NEVER discuss specific salary numbers, never accept/commit to anything contractual, never share documents — for those, reply that Philippe will follow up personally.
+
+Finish with a JSON report of every conversation you touched.
+`.trim();
+
+  try {
+    const response = await fetch(`${BASE_URL}/sessions`, {
+      method: 'POST',
+      headers: apiHeaders(apiKey),
+      body: JSON.stringify({
+        task,
+        profileId,
+        proxyCountryCode: 'pt',
+        maxCostUsd: Number(process.env.BROWSER_USE_MAX_COST_USD || 1.5),
+        outputSchema: {
+          type: 'object',
+          properties: {
+            conversations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  sender: { type: 'string' },
+                  classification: { type: 'string' },
+                  summary: { type: 'string' },
+                  reply_sent: { type: 'string' },
+                },
+                required: ['sender', 'classification', 'summary'],
+              },
+            },
+          },
+          required: ['conversations'],
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      const status = response.status === 402 ? 'no_credits' as const : 'failed' as const;
+      return { sessionId: '', liveUrl: null, status, message: `API ${response.status}: ${error.slice(0, 200)}` };
+    }
+
+    const data = await response.json();
+    return {
+      sessionId: String(data.id || data.sessionId || ''),
+      liveUrl: data.liveUrl ? String(data.liveUrl) : null,
+      status: 'queued',
+      message: 'DM sweep started',
+    };
+  } catch (err) {
+    return { sessionId: '', liveUrl: null, status: 'failed', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Fetch raw session output (used by the DM sweep finalizer). */
+export async function getSessionOutput(sessionId: string): Promise<{ done: boolean; output: unknown }> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey || !sessionId) return { done: false, output: null };
+  try {
+    const response = await fetch(`${BASE_URL}/sessions/${sessionId}`, { headers: apiHeaders(apiKey) });
+    if (!response.ok) return { done: false, output: null };
+    const data = await response.json();
+    const done = ['stopped', 'timed_out', 'error', 'idle'].includes(String(data.status));
+    let output: unknown = data.output;
+    if (typeof output === 'string') { try { output = JSON.parse(output); } catch { /* keep string */ } }
+    return { done, output };
+  } catch {
+    return { done: false, output: null };
+  }
+}
+
 export type { WebsiteApplyTask };
 
 export type { BrowserUseTask, SessionCreateResult, SessionStatusResult, EasyApplyOutput };

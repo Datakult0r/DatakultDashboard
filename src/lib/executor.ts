@@ -5,7 +5,7 @@
  * same safety rules.
  */
 import { supabaseServer } from '@/lib/supabase-server';
-import { createEasyApplySession, createWebsiteApplySession, getSessionStatus, stopSession, checkCredits } from '@/lib/browser-use';
+import { createEasyApplySession, createWebsiteApplySession, createDmSweepSession, getSessionStatus, getSessionOutput, stopSession, checkCredits } from '@/lib/browser-use';
 import type { ActionPayload } from '@/types/triage';
 
 export function todayStr(): string {
@@ -354,12 +354,90 @@ Philippe Küng`;
 }
 
 
+
+/** STEP E — daily LinkedIn DM sweep (answers recruiter DMs directly, no drafts).
+ * Runs at most once per day, gated by ENABLE_DM_SWEEP. Started sweeps are
+ * tracked in system_health (fallback_used carries the session id) and
+ * finalized on the next executor tick: every reply lands in the dashboard.
+ */
+export async function dmSweep(): Promise<{ started: boolean; finalizedReplies: number }> {
+  const out = { started: false, finalizedReplies: 0 };
+  if (process.env.ENABLE_DM_SWEEP !== 'true') return out;
+
+  const todayIso = new Date().toISOString().split('T')[0];
+
+  // Finalize any sweep started today
+  const { data: startedRows } = await supabaseServer
+    .from('system_health')
+    .select('id, fallback_used, operation')
+    .eq('source', 'dm_sweep')
+    .eq('operation', 'sweep_started')
+    .gte('created_at', todayIso);
+
+  for (const row of startedRows || []) {
+    if (!row.fallback_used) continue;
+    const { done, output } = await getSessionOutput(row.fallback_used);
+    if (!done) continue;
+
+    const conversations = (output as { conversations?: Array<Record<string, string>> } | null)?.conversations || [];
+    for (const convo of conversations) {
+      await supabaseServer.from('triage_items').insert({
+        title: `DM ${convo.reply_sent ? 'answered' : 'reviewed'}: ${convo.sender || 'unknown'}`,
+        subtitle: convo.summary || '',
+        source: 'linkedin_dm',
+        category: convo.classification === 'recruiter' || convo.classification?.includes('opportunit') ? 'urgent' : 'review',
+        priority: convo.reply_sent ? 6 : 4,
+        tags: ['dm-sweep', convo.classification || 'unknown'],
+        draft_reply: convo.reply_sent || null,
+        contact_name: convo.sender || null,
+        contact_url: 'https://www.linkedin.com/messaging/',
+        triage_date: todayIso,
+        notes: convo.reply_sent ? `Replied automatically: "${(convo.reply_sent || '').slice(0, 300)}"` : 'No reply needed',
+        action_status: null,
+      });
+      out.finalizedReplies++;
+    }
+
+    await supabaseServer.from('system_health').update({ operation: 'sweep_finalized', items_count: conversations.length }).eq('id', row.id);
+  }
+
+  // Start today's sweep if none exists yet (one per day)
+  const alreadyToday = (startedRows || []).length > 0;
+  const { data: finalizedToday } = await supabaseServer
+    .from('system_health')
+    .select('id')
+    .eq('source', 'dm_sweep')
+    .gte('created_at', todayIso)
+    .limit(1);
+
+  if (!alreadyToday && (!finalizedToday || finalizedToday.length === 0)) {
+    const result = await createDmSweepSession();
+    if (result.status === 'queued') {
+      await supabaseServer.from('system_health').insert({
+        cron_run_id: crypto.randomUUID(),
+        source: 'dm_sweep',
+        operation: 'sweep_started',
+        status: 'ok',
+        items_count: 0,
+        duration_ms: 0,
+        fallback_used: result.sessionId,
+      });
+      out.started = true;
+    } else if (result.status !== 'not_configured') {
+      await logHealth('dm_sweep', 'sweep_start', 'error', 0, 0, result.message);
+    }
+  }
+
+  return out;
+}
+
 export interface ExecutorSummary {
   finalized: { executed: number; failed: number; stillRunning: number; readyToSend: number };
   pacing: { remaining: number; cap: number; usedToday: number; maxPerRun: number; jitterSkipped: boolean };
   launch: { launched: number; errors: string[] };
   websiteFills: { launched: number; errors: string[] };
   followup: { followupsDrafted: number; ghosted: number };
+  dm: { started: boolean; finalizedReplies: number };
   duration_ms: number;
 }
 
@@ -385,12 +463,16 @@ export async function runExecutor(opts: { jitterSkip: boolean }): Promise<Execut
   // D. Follow-ups + ghosts
   const followup = await followUps();
 
+  // E. Daily LinkedIn DM sweep (answers recruiter DMs directly)
+  const dm = await dmSweep();
+
   const summary: ExecutorSummary = {
     finalized,
     pacing: { ...budget, maxPerRun, jitterSkipped: skipped },
     launch,
     websiteFills,
     followup,
+    dm,
     duration_ms: Date.now() - startTime,
   };
 
