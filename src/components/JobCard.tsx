@@ -88,6 +88,23 @@ export default function JobCard({ item }: JobCardProps) {
             )}
           </div>
 
+          {/* Hover-expanded job description — more info without more clicks */}
+          {item.subtitle && (
+            <div className="relative group/jd mb-1">
+              <p className="text-xs text-secondary/90 line-clamp-2 group-hover/jd:hidden">
+                {item.subtitle}
+              </p>
+              <div className="hidden group-hover/jd:block text-xs text-secondary leading-relaxed bg-elevated/60 border border-border/60 rounded-md p-2 animate-fade-in">
+                {item.subtitle}
+                {item.score_breakdown && Object.keys(item.score_breakdown).length > 0 && (
+                  <span className="block mt-1.5 font-mono text-[10px] text-secondary/70">
+                    {Object.entries(item.score_breakdown).map(([k, v]) => `${k} +${v}`).join(' · ')}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Location and salary row */}
           <div className="flex items-center gap-4 text-xs text-secondary mb-3">
             {item.location && (

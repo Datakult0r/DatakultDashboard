@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import {
+  Rocket,
   Shield,
   AlertCircle,
   CheckCircle2,
@@ -28,12 +29,14 @@ import ApprovalQueue from './ApprovalQueue';
 import ApplicationTracker from './ApplicationTracker';
 import MissedMeetingCard from './MissedMeetingCard';
 import MissionCriticalBar from './MissionCriticalBar';
+import HealthBar from './HealthBar';
+import LaunchBay from './LaunchBay';
 import SystemAlert from './SystemAlert';
 import ChatWidget from './ChatWidget';
 import ErrorBoundary from './ErrorBoundary';
 import type { MissionItem } from './MissionCriticalBar';
 
-type TabType = 'missed' | 'approval' | 'action' | 'review' | 'jobs' | 'applications' | 'news' | 'schedule' | 'done';
+type TabType = 'missed' | 'approval' | 'launch' | 'action' | 'review' | 'jobs' | 'applications' | 'news' | 'schedule' | 'done';
 
 interface DashboardShellProps {
   /** Initial triage items from server */
@@ -195,6 +198,48 @@ export default function DashboardShell({
     );
   }, []);
 
+  // Launch Bay: run an approved Easy Apply immediately
+  const handleRunNow = useCallback(async (id: string) => {
+    const res = await fetch('/api/actions/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error || 'Failed to launch');
+      return;
+    }
+    setItems((prev) => prev.map((item) => item.id === id
+      ? { ...item, action_status: 'executing' as const, notes: data.liveUrl ? `Applying now — watch live: ${data.liveUrl}` : 'Applying now…' }
+      : item));
+  }, []);
+
+  // Launch Bay: send a filled website application
+  const handleSend = useCallback(async (id: string) => {
+    setItems((prev) => prev.map((item) => item.id === id ? { ...item, action_status: 'executing' as const, notes: 'Submitting…' } : item));
+    const res = await fetch('/api/actions/send-website', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) alert(data.error || 'Failed to send');
+    // realtime subscription will reconcile the final state
+  }, []);
+
+  // Launch Bay: confirm a manual submission
+  const handleMarkSubmitted = useCallback(async (id: string) => {
+    const res = await fetch('/api/actions/mark-submitted', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      setItems((prev) => prev.map((item) => item.id === id ? { ...item, action_status: 'executed' as const } : item));
+    }
+  }, []);
+
   // Category filters
   const getItemsByCategory = (category: string) => {
     return items.filter((item) => item.category === category && item.status !== 'skipped');
@@ -215,6 +260,11 @@ export default function DashboardShell({
   const activeApplications = applications.filter(
     (a) => !['rejected', 'ghosted', 'withdrawn'].includes(a.status)
   );
+  const launchItems = items.filter(
+    (i) => (i.action_type === 'apply_job_easy' || i.action_type === 'apply_job_website')
+      && ['approved', 'executing', 'failed'].includes(i.action_status || '')
+  );
+  const launchActive = launchItems.filter((i) => i.action_status !== 'failed').length;
 
   // ── Mission-Critical Focus Items ──
   // Derive from pipeline contacts, high-priority items, and strategic deadlines
@@ -272,6 +322,7 @@ export default function DashboardShell({
   const tabs: { id: TabType; label: string; icon: React.ReactNode; count: number; pulse?: boolean; danger?: boolean }[] = [
     ...(missedItems.length > 0 ? [{ id: 'missed' as TabType, label: 'Missed', icon: <PhoneOff size={16} />, count: missedPending.length, pulse: missedPending.length > 0, danger: missedPending.length > 0 }] : []),
     { id: 'approval', label: 'Approve', icon: <Shield size={16} />, count: pendingActions.length, pulse: pendingActions.length > 0 },
+    { id: 'launch', label: 'Launch', icon: <Rocket size={16} />, count: launchActive, pulse: launchItems.some((i) => i.action_status === 'approved' && (i.action_payload?.ready_to_send as string) === 'true') },
     { id: 'action', label: 'Action', icon: <AlertCircle size={16} />, count: urgentItems.length },
     { id: 'review', label: 'Review', icon: <Activity size={16} />, count: reviewItems.length },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase size={16} />, count: jobItems.length },
@@ -324,6 +375,16 @@ export default function DashboardShell({
             items={actionableItems}
             onApprove={handleApprove}
             onReject={handleReject}
+          />
+        );
+
+      case 'launch':
+        return (
+          <LaunchBay
+            items={items}
+            onRunNow={handleRunNow}
+            onSend={handleSend}
+            onMarkSubmitted={handleMarkSubmitted}
           />
         );
 
@@ -547,6 +608,13 @@ export default function DashboardShell({
               icon={<CheckCircle2 size={18} className="text-success" />}
             />
           </div>
+        </div>
+      </div>
+
+      {/* System health — sources, pacing, queues */}
+      <div className="glass border-b border-border/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <HealthBar />
         </div>
       </div>
 
