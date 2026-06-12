@@ -6,7 +6,15 @@
     },
     {
       "path": "/api/jobs/auto-apply",
-      "schedule": "0 9 * * *"
+      "schedule": "23 9 * * *"
+    },
+    {
+      "path": "/api/jobs/auto-apply",
+      "schedule": "47 13 * * *"
+    },
+    {
+      "path": "/api/jobs/auto-apply",
+      "schedule": "11 17 * * *"
     },
     {
       "path": "/api/bumps/discover",
