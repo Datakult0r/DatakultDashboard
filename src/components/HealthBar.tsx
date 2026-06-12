@@ -13,6 +13,7 @@ interface SourceHealth {
 
 interface HealthPayload {
   ok: boolean;
+  timestamp: string;
   sources: Record<string, SourceHealth>;
   pacing: { appliedToday: number; easyAppliedToday: number; easyApplyCap: number; executing: number };
   queues: { pendingApproval: number; approvedWaiting: number; readyToSend: number };
@@ -55,7 +56,7 @@ export default function HealthBar() {
   if (!health) return null;
 
   const dotClass = (s: SourceHealth) => {
-    const ageH = (Date.now() - new Date(s.when).getTime()) / 3600000;
+    const ageH = (new Date(health.timestamp).getTime() - new Date(s.when).getTime()) / 3600000;
     if (s.status === 'error') return 'bg-danger';
     if (s.status === 'skipped' || ageH > 26) return 'bg-warning';
     return 'bg-success';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageSquare, Send, X, Loader2, Sparkles, ChevronUp } from 'lucide-react';
+import { MessageSquare, Send, X, Loader2, Sparkles } from 'lucide-react';
 import type { TriageItem, JobApplication, TriageStat } from '@/types/triage';
 
 interface ChatMessage {

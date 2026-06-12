@@ -2,13 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import {
-  Send,
   Search,
   Filter,
-  Clock,
   TrendingUp,
   XCircle,
-  CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
 import type { JobApplication, ApplicationStatus } from '@/types/triage';
@@ -46,11 +43,13 @@ export default function ApplicationTracker({
   onStatusChange,
 }: ApplicationTrackerProps) {
   const [filter, setFilter] = useState<FilterMode>('active');
+  // Snapshot once per mount — keeps useMemo pure (react-hooks/purity)
+  const [nowTs] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState('');
 
   // Calculate pipeline stats
   const stats: PipelineStats = useMemo(() => {
-    const now = Date.now();
+    const now = nowTs;
     let staleCount = 0;
     const counts: PipelineStats = {
       total: applications.length,
@@ -75,11 +74,11 @@ export default function ApplicationTracker({
     }
     counts.stale = staleCount;
     return counts;
-  }, [applications]);
+  }, [applications, nowTs]);
 
   // Filter and search applications
   const filteredApps = useMemo(() => {
-    const now = Date.now();
+    const now = nowTs;
     let filtered = applications;
 
     // Apply filter mode
@@ -123,7 +122,7 @@ export default function ApplicationTracker({
       if (aTerminal !== bTerminal) return aTerminal ? 1 : -1;
       return new Date(b.applied_date).getTime() - new Date(a.applied_date).getTime();
     });
-  }, [applications, filter, searchQuery]);
+  }, [applications, filter, searchQuery, nowTs]);
 
   const filterButtons: { mode: FilterMode; label: string; icon: React.ReactNode; count: number }[] = [
     { mode: 'active', label: 'Active', icon: <TrendingUp size={12} />, count: stats.total - stats.rejected - stats.ghosted },

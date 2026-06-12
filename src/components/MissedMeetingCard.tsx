@@ -47,7 +47,6 @@ export default function MissedMeetingCard({ item, onApprove, onReject }: MissedM
   const missedDateStr = missedTime ? format(missedTime, 'EEE MMM d, HH:mm') : null;
 
   const isCritical = item.tags?.includes('critical');
-  const missCount = item.title.match(/3rd|third/i) ? 3 : item.title.match(/2nd|second/i) ? 2 : 1;
 
   const handleCopy = async () => {
     if (item.draft_reply) {

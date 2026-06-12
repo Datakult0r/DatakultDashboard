@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import {
-  Building2,
   MapPin,
   DollarSign,
   ExternalLink,
@@ -64,18 +63,20 @@ const PIPELINE_STAGES: ApplicationStatus[] = ['applied', 'screening', 'interview
  */
 export default function ApplicationRow({ application, onStatusChange }: ApplicationRowProps) {
   const [expanded, setExpanded] = useState(false);
+  // Snapshot once per mount — keeps render pure (react-hooks/purity)
+  const [nowTs] = useState(() => Date.now());
   const statusConfig = STATUS_CONFIG[application.status];
   const isTerminal = ['rejected', 'ghosted', 'withdrawn'].includes(application.status);
 
   // Calculate days since applied
   const daysSinceApplied = Math.floor(
-    (Date.now() - new Date(application.applied_date).getTime()) / (1000 * 60 * 60 * 24)
+    (nowTs - new Date(application.applied_date).getTime()) / (1000 * 60 * 60 * 24)
   );
 
   // Calculate days since last activity
   const daysSinceActivity = application.last_activity_date
     ? Math.floor(
-        (Date.now() - new Date(application.last_activity_date).getTime()) / (1000 * 60 * 60 * 24)
+        (nowTs - new Date(application.last_activity_date).getTime()) / (1000 * 60 * 60 * 24)
       )
     : daysSinceApplied;
 

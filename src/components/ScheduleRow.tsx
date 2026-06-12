@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, MapPin, ExternalLink, User, Video } from 'lucide-react';
+import { MapPin, ExternalLink, User, Video } from 'lucide-react';
 import { format, isPast, isSameDay } from 'date-fns';
 import type { TriageItem } from '@/types/triage';
 

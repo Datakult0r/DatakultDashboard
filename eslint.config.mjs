@@ -1,13 +1,15 @@
-import { FlatCompat } from '@eslint/eslintrc';
-import js from '@eslint/js';
-
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-  recommendedConfig: js.configs.recommended,
-});
+// Flat config for ESLint 9 + Next 16.
+// The previous FlatCompat bridge crashed ("Invalid config schema") because
+// eslint-config-next now ships native flat configs — use them directly.
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTs from 'eslint-config-next/typescript';
 
 const eslintConfig = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...nextVitals,
+  ...nextTs,
+  {
+    ignores: ['.next/**', 'node_modules/**'],
+  },
 ];
 
 export default eslintConfig;

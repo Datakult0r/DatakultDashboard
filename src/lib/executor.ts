@@ -416,6 +416,38 @@ export async function dmSweep(): Promise<{ started: boolean; finalizedReplies: n
         action_status: null,
       });
       out.finalizedReplies++;
+
+      // Continuity: an answered opportunity DM is a pipeline relationship.
+      // Upsert into job_applications (method=recruiter) so the follow-up
+      // engine keeps the conversation alive automatically.
+      const isOpportunity = (convo.classification || '').match(/recruiter|opportunit/i);
+      if (isOpportunity && convo.reply_sent && convo.sender) {
+        const { data: existing } = await supabaseServer
+          .from('job_applications')
+          .select('id')
+          .eq('method', 'recruiter')
+          .eq('contact_name', convo.sender)
+          .not('status', 'in', '("rejected","withdrawn","offer")')
+          .limit(1);
+        if (existing && existing.length > 0) {
+          await supabaseServer.from('job_applications').update({
+            last_activity_date: todayIso,
+            notes: `Last DM: ${ (convo.summary || '').slice(0, 200) }`,
+          }).eq('id', existing[0].id);
+        } else {
+          await supabaseServer.from('job_applications').insert({
+            company: convo.company || 'via LinkedIn DM',
+            role: convo.role || 'Opportunity (LinkedIn DM)',
+            method: 'recruiter',
+            status: 'screening',
+            applied_date: todayIso,
+            last_activity_date: todayIso,
+            contact_name: convo.sender,
+            contact_url: 'https://www.linkedin.com/messaging/',
+            notes: (convo.summary || '').slice(0, 300),
+          });
+        }
+      }
     }
 
     await supabaseServer.from('system_health').update({ operation: 'sweep_finalized', items_count: conversations.length }).eq('id', row.id);

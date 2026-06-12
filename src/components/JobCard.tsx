@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, Briefcase, MapPin, DollarSign, FileText, Zap, RotateCcw, Sparkles } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, FileText, Zap, RotateCcw, Sparkles } from 'lucide-react';
 import type { TriageItem } from '@/types/triage';
 import ScoreChip from './ScoreChip';
 

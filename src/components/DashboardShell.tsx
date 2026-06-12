@@ -13,7 +13,6 @@ import {
   Activity,
   Send,
   PhoneOff,
-  ExternalLink,
   Globe,
   CalendarDays,
   Link2,
@@ -57,7 +56,7 @@ export default function DashboardShell({
   initialApplications,
 }: DashboardShellProps) {
   const [items, setItems] = useState<TriageItem[]>(initialItems);
-  const [stats, setStats] = useState<TriageStat | null>(initialStats);
+  const [stats] = useState<TriageStat | null>(initialStats);
   const [applications, setApplications] = useState<JobApplication[]>(initialApplications);
   // Default to missed tab if there are pending missed items, otherwise approval
   const [activeTab, setActiveTab] = useState<TabType>(

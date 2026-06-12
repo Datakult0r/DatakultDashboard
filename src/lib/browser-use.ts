@@ -401,7 +401,9 @@ export async function createDmSweepSession(): Promise<SessionCreateResult> {
   const task = `
 You manage LinkedIn messages for Philippe Küng (Head of AI / Founder, Clinic of AI, based in Lisbon). You are logged in. If you see a login page, captcha, or security checkpoint: DO NOT log in or solve it — finish immediately reporting logged_out. Open https://www.linkedin.com/messaging/ and process UNREAD conversations only, at a calm human pace. Maximum ${process.env.DM_SWEEP_MAX_REPLIES || 8} replies this session.
 
-For each unread conversation, classify and act:
+ALSO revisit recent conversations (last 14 days) that look like job opportunities where either (a) the other person's last message was never answered, or (b) Philippe's last message got no reply for 5+ days — send a short, natural follow-up nudge in case (b). Conversations are relationships, not one-shot replies.
+
+For each conversation you touch, classify and act:
 1. RECRUITER / JOB OPPORTUNITY (role offer, "are you open to...", interview request):
    Reply directly in Philippe's voice — warm, confident, concise (2-4 sentences):
    - If the role sounds senior, AI-related, remote or DACH/EU: express interest, ask for the JD and compensation range if not given, and propose a call: https://cal.read.ai/philippe-datakult/30-min
@@ -435,6 +437,8 @@ Finish with a JSON report of every conversation you touched.
                   classification: { type: 'string' },
                   summary: { type: 'string' },
                   reply_sent: { type: 'string' },
+                  company: { type: 'string' },
+                  role: { type: 'string' },
                 },
                 required: ['sender', 'classification', 'summary'],
               },
