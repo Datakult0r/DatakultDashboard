@@ -4,16 +4,17 @@ import type { ActionPayload } from '@/types/triage';
 
 /**
  * POST /api/actions/apply-website
- * Handles non-LinkedIn website application flow.
  *
- * For website applications, the agent's job is to:
- * 1. Find the career page URL (already done by Firecrawl in the cron)
- * 2. Prepare cover letter + tailored CV notes (already done by scoring + CV tailor)
- * 3. Mark as ready-to-apply with all materials prepared
+ * HONESTY FIX: this route used to mark items 'executed' and insert a
+ * job_applications row with status='applied' even though NOTHING had been
+ * submitted — which is why the pipeline showed dozens of "applied" jobs that
+ * never got a response. An application that was never sent can't convert.
  *
- * Actual form filling happens via Chrome MCP during agent sessions,
- * NOT via this API route. This route marks the application as "materials ready"
- * and creates the job_application record for pipeline tracking.
+ * Now it only stages the materials: the item stays 'approved' with a
+ * ready_to_submit flag, and shows up in the dashboard's "Your queue" with the
+ * career page link, cover letter and CV notes one click away. The pipeline row
+ * is created by /api/actions/mark-submitted ONLY when Philippe confirms he
+ * actually submitted (or when a future website-automation agent confirms it).
  *
  * Body: { ids: string[] }
  */
@@ -25,7 +26,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing or empty ids array' }, { status: 400 });
     }
 
-    // Fetch approved website-apply items
     const { data: items, error: fetchError } = await supabaseServer
       .from('triage_items')
       .select('*')
@@ -47,49 +47,21 @@ export async function POST(request: NextRequest) {
       const payload = (item.action_payload || {}) as ActionPayload;
       const careerUrl = payload.company_career_url || item.contact_url || null;
 
-      // Update triage item status
       await supabaseServer
         .from('triage_items')
         .update({
-          action_status: 'executed',
+          action_payload: { ...payload, ready_to_submit: 'true' },
           notes: careerUrl
-            ? `Materials prepared. Apply at: ${careerUrl}`
-            : 'Materials prepared. Career page URL not found — search manually.',
+            ? `Materials ready — submit at: ${careerUrl} (then click "Mark submitted")`
+            : 'Materials ready — career page not found, search manually, then click "Mark submitted".',
           updated_at: new Date().toISOString(),
         })
         .eq('id', item.id);
 
-      // Create job application record for pipeline tracking
-      await supabaseServer.from('job_applications').insert({
-        company: item.company || '',
-        role: item.role_title || item.title || '',
-        job_url: item.source_url || '',
-        location: item.location || '',
-        salary_range: item.salary_range || '',
-        job_type: item.job_type || '',
-        method: 'website',
-        status: 'applied',
-        applied_date: new Date().toISOString().split('T')[0],
-        cover_letter: item.cover_letter || '',
-        tailored_cv_notes: item.tailored_cv_notes || '',
-        contact_url: careerUrl || '',
-        source_triage_id: item.id,
-        score: item.score || 0,
-        score_label: item.score_label || null,
-      });
-
-      results.push({
-        id: item.id,
-        status: 'executed',
-        careerUrl,
-      });
+      results.push({ id: item.id, status: 'materials_ready', careerUrl });
     }
 
-    return NextResponse.json({
-      success: true,
-      applied: results.length,
-      results,
-    });
+    return NextResponse.json({ success: true, staged: results.length, results });
   } catch (err) {
     console.error('Website apply error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
