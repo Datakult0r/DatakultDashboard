@@ -37,6 +37,70 @@ export interface EasyApplyResult {
   authOk: boolean;
 }
 
+/** Structured output every apply session must return (enforced via outputSchema). */
+const APPLY_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    submitted: { type: 'boolean' },
+    reason: { type: 'string' },
+    unanswered_questions: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['submitted', 'reason'],
+} as const;
+
+export interface SessionVerification {
+  sessionId: string;
+  /** Browser Use session status */
+  status: string;
+  /** Did the agent CONFIRM the application was submitted? */
+  submitted: boolean;
+  /** Agent-reported detail (failure reason / unanswered questions) */
+  detail: string;
+  /** Session reached a terminal state */
+  done: boolean;
+}
+
+/**
+ * Poll a session for completion + verified outcome.
+ * An application may only be recorded as applied when submitted === true.
+ */
+export async function getSessionVerification(sessionId: string): Promise<SessionVerification> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  const out: SessionVerification = { sessionId, status: 'unknown', submitted: false, detail: '', done: false };
+  if (!apiKey || !sessionId) return out;
+  try {
+    const r = await fetch(`${BU_BASE}/sessions/${sessionId}`, { headers: { [BU_HEADER]: apiKey } });
+    if (!r.ok) return { ...out, detail: `API ${r.status}` };
+    const data = await r.json();
+    out.status = String(data.status ?? 'unknown');
+    out.done = ['stopped', 'timed_out', 'error', 'idle'].includes(out.status);
+    let output: Record<string, unknown> = {};
+    try {
+      output = typeof data.output === 'string' ? JSON.parse(data.output) : (data.output ?? {});
+    } catch {
+      out.detail = typeof data.output === 'string' ? data.output.slice(0, 300) : '';
+    }
+    out.submitted = Boolean(output.submitted) && Boolean(data.isTaskSuccessful ?? true);
+    const unanswered = Array.isArray(output.unanswered_questions) ? output.unanswered_questions.join('; ') : '';
+    out.detail = [output.reason, unanswered ? `unanswered: ${unanswered}` : null].filter(Boolean).join(' — ') || out.detail;
+    return out;
+  } catch (err) {
+    return { ...out, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Stop a session (flushes profile cookies on clean exit). */
+export async function stopSession(sessionId: string): Promise<boolean> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey || !sessionId) return false;
+  try {
+    const r = await fetch(`${BU_BASE}/sessions/${sessionId}/stop`, { method: 'POST', headers: { [BU_HEADER]: apiKey } });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Verify the API key works. Cheap GET — returns true on 2xx. */
 export async function verifyAuth(apiKey: string): Promise<{ ok: boolean; status: number; detail?: string }> {
   try {
@@ -53,15 +117,29 @@ export async function verifyAuth(apiKey: string): Promise<{ ok: boolean; status:
 
 /** Submit one Easy Apply task. POST /api/v3/sessions. */
 async function submitEasyApply(apiKey: string, task: BrowserUseTask): Promise<BrowserUseResult> {
+  const profileId = process.env.BROWSER_USE_PROFILE_ID;
+  if (!profileId) {
+    // HARD GUARD: without a persistent logged-in profile the cloud browser is
+    // NOT logged in to LinkedIn. Running anyway would hit a login wall (or
+    // worse, look like an account-takeover attempt). Refuse.
+    return {
+      taskId: '',
+      status: 'failed',
+      message: 'BROWSER_USE_PROFILE_ID not set — create a profile at cloud.browser-use.com, log in to LinkedIn in it once, set the env var. Easy Apply refuses to run without it (account safety).',
+      jobUrl: task.jobUrl,
+    };
+  }
+
   const instructions = [
+    'If at ANY point you see a login page, captcha, or security checkpoint: DO NOT log in or solve it. Finish immediately with submitted=false, reason="logged_out".',
     `Navigate to ${task.jobUrl}`,
-    'Wait 2-4 seconds (randomized).',
-    'Click the "Easy Apply" button.',
+    'Read the job description: scroll down slowly (3-5 seconds), then back up. Behave like a careful human.',
+    'Click the "Easy Apply" button. If there is none, finish with submitted=false, reason="no_easy_apply_button".',
     'Wait for the application form to load.',
-    'Fill in fields with: Name "Philippe Küng", Email "philippe.kung@clinicofai.com", Location "Lisbon, Portugal".',
+    'Keep any values LinkedIn pre-filled. For empty required fields use: Name "Philippe Küng", Email "philippe.kung@clinicofai.com", Location "Lisbon, Portugal"' + (process.env.PHILIPPE_PHONE ? `, Phone "${process.env.PHILIPPE_PHONE}"` : '') + '.',
     task.coverLetter ? `Cover letter: ${task.coverLetter.slice(0, 800)}` : '',
-    'Submit and wait for confirmation. If a multi-step form, fill what you can; do not invent answers.',
-    'On success, return the confirmation message verbatim.',
+    'If a REQUIRED question cannot be answered from the values above (salary, visa specifics, niche skill years): DO NOT GUESS — discard the application and finish with submitted=false, reason="needs_human", listing the questions in unanswered_questions.',
+    'Otherwise submit and wait for the "application sent" confirmation, then finish with submitted=true.',
   ].filter(Boolean).join('\n');
 
   try {
@@ -74,6 +152,10 @@ async function submitEasyApply(apiKey: string, task: BrowserUseTask): Promise<Br
       body: JSON.stringify({
         task: instructions,
         title: `Easy Apply · ${task.company}`,
+        profileId,
+        proxyCountryCode: 'pt',
+        maxCostUsd: Number(process.env.BROWSER_USE_MAX_COST_USD || 1.5),
+        outputSchema: APPLY_OUTPUT_SCHEMA,
       }),
     });
 
@@ -178,9 +260,12 @@ async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise
     '  Timezone: UTC+1 Lisbon, flexible ±3 hours',
     '  Remote: Yes',
     task.coverLetter ? `If asked for cover letter / "Why are you a good fit": ${task.coverLetter.slice(0, 1200)}` : '',
-    'If a CV / resume upload is required, look for an existing uploaded resume on the page (LinkedIn auto-fill, prior session). If not available, SKIP this job — do not submit incomplete.',
-    'Do NOT invent answers to questions you cannot map to the values above. If a required question is unanswerable, SKIP and return "skipped_required_field" with the field name.',
-    'Submit only when all required fields are filled. Return the confirmation message verbatim.',
+    process.env.CV_PUBLIC_URL
+      ? `If a CV / resume upload is required, the CV file is available at: ${process.env.CV_PUBLIC_URL} — download it and upload it to the form.`
+      : 'If a CV / resume upload is REQUIRED and cannot be skipped, finish with submitted=false, reason="needs_cv_upload" — do not submit incomplete.',
+    'If the form requires creating an account or logging in: finish with submitted=false, reason="needs_account". Never create accounts or log in.',
+    'Do NOT invent answers to questions you cannot map to the values above. If a required question is unanswerable, finish with submitted=false, reason="needs_human", listing the fields in unanswered_questions.',
+    'Submit only when all required fields are filled. Wait for the confirmation message, then finish with submitted=true.',
   ].filter(Boolean).join('\n');
 
   try {
@@ -193,6 +278,11 @@ async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise
       body: JSON.stringify({
         task: instructions,
         title: `Website Apply · ${task.company}`,
+        // Company sites carry no LinkedIn ban risk — use the cheap model when configured.
+        model: process.env.BROWSER_USE_WEBSITE_MODEL || undefined,
+        proxyCountryCode: 'pt',
+        maxCostUsd: Number(process.env.BROWSER_USE_WEBSITE_MAX_COST_USD || 0.75),
+        outputSchema: APPLY_OUTPUT_SCHEMA,
       }),
     });
 

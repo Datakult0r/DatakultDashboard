@@ -59,7 +59,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
-import { executeEasyApply, executeWebsiteApply } from '@/lib/browser-use';
+import { executeEasyApply, executeWebsiteApply, getSessionVerification, stopSession } from '@/lib/browser-use';
 import type { BrowserUseTask } from '@/lib/browser-use';
 import type { ActionPayload } from '@/types/triage';
 
@@ -130,6 +130,105 @@ type RunResult = {
   source: 'triage_items' | 'philippe_jobs';
 };
 
+/**
+ * Benign agent refusals — honest "I didn't apply" outcomes, NOT bot-detection
+ * signals. They must not trigger the 24h auto-pause or halt the run.
+ */
+const BENIGN_REASONS = ['needs_human', 'needs_cv_upload', 'needs_account', 'no_easy_apply_button', 'job_not_found', 'no_job_url', 'skipped_required_field'];
+
+function isBenign(reason: string | null | undefined): boolean {
+  return Boolean(reason && BENIGN_REASONS.some((b) => reason.includes(b)));
+}
+
+const EXECUTING_TIMEOUT_MIN = 45;
+
+/**
+ * FINALIZE: poll Browser Use sessions for items left in 'executing'.
+ * Only a verified submitted=true becomes executed + a job_applications row —
+ * a QUEUED session is not an application (the old code marked executed on
+ * queue, which is how the pipeline filled with phantom "applied" rows).
+ */
+async function finalizeExecuting(): Promise<{ executed: number; failed: number; running: number }> {
+  const out = { executed: 0, failed: 0, running: 0 };
+  const { data: executing } = await supabaseServer
+    .from('triage_items')
+    .select('*')
+    .eq('action_status', 'executing')
+    .in('action_type', ['apply_job_easy', 'apply_job_website']);
+
+  for (const item of executing ?? []) {
+    const payload = (item.action_payload ?? {}) as ActionPayload;
+    const sessionId = (payload.browser_use_session_id as string) || '';
+    const nowIso = new Date().toISOString();
+
+    if (!sessionId) {
+      await supabaseServer.from('triage_items').update({
+        action_status: 'failed',
+        notes: 'Stuck in executing with no session id — re-approve to retry.',
+        updated_at: nowIso,
+      }).eq('id', item.id);
+      out.failed++;
+      continue;
+    }
+
+    const v = await getSessionVerification(sessionId);
+
+    if (!v.done) {
+      const startedAt = payload.last_attempt_at ? new Date(payload.last_attempt_at as string).getTime() : 0;
+      const ageMin = startedAt ? (Date.now() - startedAt) / 60000 : 0;
+      if (ageMin > EXECUTING_TIMEOUT_MIN) {
+        await stopSession(sessionId);
+        await supabaseServer.from('triage_items').update({
+          action_status: 'failed',
+          notes: `Session timed out after ${Math.round(ageMin)} min — stopped. ${v.detail}`.trim(),
+          updated_at: nowIso,
+        }).eq('id', item.id);
+        out.failed++;
+      } else {
+        out.running++;
+      }
+      continue;
+    }
+
+    if (v.submitted) {
+      await supabaseServer.from('triage_items').update({
+        action_status: 'executed',
+        notes: `Application submitted ✓ (verified).`,
+        action_payload: { ...payload, sent_at: nowIso },
+        updated_at: nowIso,
+      }).eq('id', item.id);
+      await supabaseServer.from('job_applications').insert({
+        company: item.company || '',
+        role: item.role_title || item.title || '',
+        job_url: (payload.job_url as string) || item.source_url || '',
+        location: item.location || '',
+        salary_range: item.salary_range || '',
+        job_type: item.job_type || '',
+        method: item.action_type === 'apply_job_easy' ? 'easy_apply' : 'website',
+        status: 'applied',
+        applied_date: nowIso.split('T')[0],
+        last_activity_date: nowIso.split('T')[0],
+        cover_letter: item.cover_letter || '',
+        tailored_cv_notes: item.tailored_cv_notes || '',
+        source_triage_id: item.id,
+        score: item.score || 0,
+        score_label: item.score_label || null,
+      });
+      out.executed++;
+    } else {
+      await supabaseServer.from('triage_items').update({
+        action_status: 'failed',
+        notes: isBenign(v.detail)
+          ? `Needs you: ${v.detail}`
+          : `Apply failed: ${v.detail || v.status}`,
+        updated_at: nowIso,
+      }).eq('id', item.id);
+      out.failed++;
+    }
+  }
+  return out;
+}
+
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
   const secret = process.env.CRON_SECRET;
@@ -138,6 +237,11 @@ export async function GET(request: NextRequest) {
   }
 
   const start = Date.now();
+
+  // FINALIZE previous sessions first — polling is invisible to LinkedIn and
+  // turns 'executing' into verified outcomes before we decide today's budget.
+  const finalized = await finalizeExecuting();
+
   const cap = Math.max(
     1,
     Math.min(HARD_CEILING, Number(process.env.AUTO_APPLY_DAILY_CAP ?? DEFAULT_CAP)),
@@ -156,16 +260,22 @@ export async function GET(request: NextRequest) {
       .limit(1),
     supabaseServer
       .from('triage_items')
-      .select('id')
+      .select('id, notes')
       .eq('action_status', 'failed')
       .in('action_type', ['apply_job_easy', 'apply_job_website'])
       .gte('updated_at', since24h)
-      .limit(1),
+      .limit(10),
   ]);
+
+  // Benign refusals (needs_human / needs_cv_upload / …) are honest outcomes,
+  // not detection signals — they must not freeze the pipeline for 24h.
+  const realTriageFailures = (triageFailed.data ?? []).filter(
+    (r) => !isBenign((r as { notes?: string | null }).notes)
+  );
 
   if (
     (legacyFailed.data && legacyFailed.data.length > 0) ||
-    (triageFailed.data && triageFailed.data.length > 0)
+    realTriageFailures.length > 0
   ) {
     await logHealth(
       'browser_use',
@@ -215,7 +325,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       source: 'triage_items',
-      autoApplied: successCount,
+      sessionsStarted: successCount,
+      finalized,
       queueSize: triageQueue.length,
       cap,
       results,
@@ -331,7 +442,10 @@ async function processTriageQueue(queue: TriageJobRow[]): Promise<RunResult[]> {
         : await executeWebsiteApply([task]);
 
     const r0 = submitResult.results?.[0];
-    const ok = Boolean(r0 && (r0.status === 'completed' || r0.status === 'queued'));
+    // 'queued' means the cloud session STARTED — it is NOT a submitted
+    // application. Mark executing; the next cron run verifies the outcome
+    // (finalizeExecuting) and only then records an application.
+    const ok = Boolean(r0 && r0.status === 'queued');
     const sessionId = r0?.taskId ?? null;
     const reason = r0?.message ?? submitResult.error ?? null;
     const nowIso = new Date().toISOString();
@@ -339,43 +453,26 @@ async function processTriageQueue(queue: TriageJobRow[]): Promise<RunResult[]> {
     await supabaseServer
       .from('triage_items')
       .update({
-        action_status: ok ? 'executed' : 'failed',
-        notes: reason ?? undefined,
+        action_status: ok ? 'executing' : 'failed',
+        notes: ok ? `Applying now — session ${sessionId}` : reason ?? undefined,
         action_payload: {
           ...payload,
           browser_use_session_id: sessionId,
-          sent_at: ok ? nowIso : null,
           last_attempt_at: nowIso,
           last_attempt_reason: reason ?? null,
         },
-        last_follow_up_at: ok ? nowIso : payload?.last_follow_up_at ?? null,
         updated_at: nowIso,
       })
       .eq('id', item.id);
 
-    if (ok) {
-      await supabaseServer.from('job_applications').insert({
-        company: item.company || '',
-        role: item.role_title || item.title || '',
-        job_url: jobUrl,
-        location: item.location || '',
-        salary_range: item.salary_range || '',
-        job_type: item.job_type || '',
-        method: item.action_type === 'apply_job_easy' ? 'easy_apply' : 'website',
-        status: 'applied',
-        applied_date: new Date().toISOString().split('T')[0],
-        cover_letter: item.cover_letter || '',
-        tailored_cv_notes: item.tailored_cv_notes || '',
-        source_triage_id: item.id,
-        score: item.score ?? 0,
-        score_label: item.score_label,
-      });
-    }
+    // NOTE: no job_applications insert here — that happens ONLY in
+    // finalizeExecuting() after the agent confirms submitted=true.
 
     results.push({ id: item.id, ok, reason, sessionId, source: 'triage_items' });
 
-    if (!ok) {
-      // Halt-on-failure: do not submit the rest of the queue in this run.
+    if (!ok && !isBenign(reason)) {
+      // Halt-on-failure: a non-benign failure may be a detection signal —
+      // do not submit the rest of the queue in this run.
       break;
     }
 
