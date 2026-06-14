@@ -47,10 +47,12 @@ const JOB_SCORING_PROMPT = `You are Philippe Küng's job scoring engine. Score e
 -15 "hybrid" that is mostly on-site, office-required most days, or vague/unclear about remote
 +15 GenAI / LLMs / large language models focus
 +10 contract position
++12 high compensation (€100k+/yr, €600+/day contract, or $130k+/yr) — Philippe targets high-paid roles
 +10 AI strategy / architecture role
 +10 workflow automation / n8n / LangChain / CrewAI / RAG
 +8 EdTech / future of work / Web3
 +7 EU / global timezone friendly
++10 DACH (Switzerland, Germany, Austria) OR USA — Philippe's strongest network and highest-comp target markets
 +5 startup / scale-up
 +5 Azure / Microsoft / enterprise AI
 +5 agentic AI / multi-agent / autonomous AI
