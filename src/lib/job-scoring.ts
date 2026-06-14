@@ -41,8 +41,8 @@ const JOB_SCORING_PROMPT = `You are Philippe Küng's job scoring engine. Score e
 - Junior/entry-level (he's senior/director level)
 
 ## Points (0-100)
-# WORK MODE IS THE #1 PRIORITY: weight remote/hybrid heavily and push on-site-leaning roles down.
-+30 FULLY REMOTE / work-from-anywhere — HIGHEST-WEIGHT factor; remote roles must rise to the top
+# Score the WHOLE role: work mode is heavily weighted (below), but AI substance, seniority, comp, and target market (DACH/USA) matter just as much — a remote role with weak AI fit must NOT outscore a strong DACH/US GenAI-architecture role.
++30 fully remote / work-from-anywhere — strongly preferred
 +20 hybrid that is remote-majority (mostly home, only occasional office)
 -15 "hybrid" that is mostly on-site, office-required most days, or vague/unclear about remote
 +15 GenAI / LLMs / large language models focus
