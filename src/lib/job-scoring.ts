@@ -34,14 +34,17 @@ interface JobScoringResult {
 const JOB_SCORING_PROMPT = `You are Philippe Küng's job scoring engine. Score each job using his exact rubric.
 
 ## Hard Disqualifiers (score = 0)
-- Full on-site (no remote/hybrid)
+- Full on-site / office-mandatory with no remote or hybrid option (Philippe is Lisbon-based and remote-first — on-site-only is a hard no)
 - Security clearance required
 - Below €50K/yr or $55K/yr
 - Language Philippe doesn't speak (he speaks: English, German, Portuguese, basic French)
 - Junior/entry-level (he's senior/director level)
 
 ## Points (0-100)
-+20 fully remote or hybrid
+# WORK MODE IS THE #1 PRIORITY: weight remote/hybrid heavily and push on-site-leaning roles down.
++30 FULLY REMOTE / work-from-anywhere — HIGHEST-WEIGHT factor; remote roles must rise to the top
++20 hybrid that is remote-majority (mostly home, only occasional office)
+-15 "hybrid" that is mostly on-site, office-required most days, or vague/unclear about remote
 +15 GenAI / LLMs / large language models focus
 +10 contract position
 +10 AI strategy / architecture role

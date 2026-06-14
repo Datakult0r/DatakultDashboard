@@ -305,6 +305,25 @@ export async function scrapeCareerPage(companyName: string, jobTitle: string): P
   }
 }
 
+
+export async function scrapeOgImage(url: string | null): Promise<string | null> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey || !url || !url.startsWith('http')) return null;
+  try {
+    const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, timeout: 20000 }),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const m = (data?.data?.metadata || {}) as Record<string, unknown>;
+    const cand = m.ogImage ?? m['og:image'] ?? m['twitter:image'] ?? m.image ?? m.ogImageUrl;
+    const val = Array.isArray(cand) ? cand[0] : cand;
+    return typeof val === 'string' && val.startsWith('http') ? val : null;
+  } catch { return null; }
+}
+
 export type { NewsItem, ContentSource, FirecrawlResult };
 
 

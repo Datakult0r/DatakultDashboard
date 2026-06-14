@@ -8,7 +8,7 @@ import { discoverJobsRemoteOK } from '@/lib/remoteok';
 import { discoverJobsArbeitSwiss } from '@/lib/arbeit-swiss';
 import { scoreJobs } from '@/lib/job-scoring';
 import { tailorCVForJobs } from '@/lib/cv-tailor';
-import { scrapeIntelligence, scrapeCareerPage, scrapeCompanyAbout } from '@/lib/firecrawl';
+import { scrapeIntelligence, scrapeCareerPage, scrapeCompanyAbout, scrapeOgImage } from '@/lib/firecrawl';
 import { fetchPerplexityNews } from '@/lib/perplexity';
 import { generateContentDrafts } from '@/lib/content-engine';
 
@@ -507,6 +507,11 @@ export async function GET(request: NextRequest) {
           source_url: item.url,
           triage_date: today,
         }));
+
+        // Perplexity returns article text but rarely images — pull each article's
+        // og:image via Firecrawl so the News cards show real previews (top 10).
+        const needImg = newsItems.filter((n) => !n.news_image_url && n.source_url).slice(0, 10);
+        await Promise.all(needImg.map(async (n) => { n.news_image_url = await scrapeOgImage(n.source_url); }));
 
         // Insert one row at a time so a single duplicate doesn't sink the whole batch.
         // The unique partial index idx_triage_idempotency(source, source_url, triage_date)

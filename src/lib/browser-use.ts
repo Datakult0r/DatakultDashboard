@@ -281,7 +281,7 @@ async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise
         // Company sites carry no LinkedIn ban risk — use the cheap model when configured.
         model: process.env.BROWSER_USE_WEBSITE_MODEL || undefined,
         proxyCountryCode: 'pt',
-        maxCostUsd: Number(process.env.BROWSER_USE_WEBSITE_MAX_COST_USD || 0.75),
+        maxCostUsd: Number(process.env.BROWSER_USE_WEBSITE_MAX_COST_USD || 3),
         outputSchema: APPLY_OUTPUT_SCHEMA,
       }),
     });
