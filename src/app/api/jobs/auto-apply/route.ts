@@ -134,7 +134,7 @@ type RunResult = {
  * Benign agent refusals — honest "I didn't apply" outcomes, NOT bot-detection
  * signals. They must not trigger the 24h auto-pause or halt the run.
  */
-const BENIGN_REASONS = ['needs_human', 'needs_cv_upload', 'needs_account', 'no_easy_apply_button', 'job_not_found', 'no_job_url', 'skipped_required_field'];
+const BENIGN_REASONS = ['needs_human', 'needs_cv_upload', 'needs_account', 'no_easy_apply_button', 'job_not_found', 'no_job_url', 'skipped_required_field', 'stuck', 'no session id', 're-approve'];
 
 function isBenign(reason: string | null | undefined): boolean {
   return Boolean(reason && BENIGN_REASONS.some((b) => reason.includes(b)));
@@ -247,8 +247,9 @@ export async function GET(request: NextRequest) {
     Math.min(HARD_CEILING, Number(process.env.AUTO_APPLY_DAILY_CAP ?? DEFAULT_CAP)),
   );
 
-  // ── Auto-pause: if anything failed in the last 24h, cool off the whole day.
-  // Check BOTH tables for a recent FAILED signal.
+  // ── Auto-pause: ONLY a real LinkedIn Easy Apply failure in the last 24h cools off
+  // (account-safety). Company-website apply failures are site/cost issues, not a
+  // LinkedIn detection signal, so they must NEVER freeze the pipeline.
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const [legacyFailed, triageFailed] = await Promise.all([
@@ -262,7 +263,7 @@ export async function GET(request: NextRequest) {
       .from('triage_items')
       .select('id, notes')
       .eq('action_status', 'failed')
-      .in('action_type', ['apply_job_easy', 'apply_job_website'])
+      .eq('action_type', 'apply_job_easy')
       .gte('updated_at', since24h)
       .limit(10),
   ]);
