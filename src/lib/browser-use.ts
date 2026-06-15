@@ -280,6 +280,7 @@ async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise
         title: `Website Apply · ${task.company}`,
         // Company sites carry no LinkedIn ban risk — use the cheap model when configured.
         model: process.env.BROWSER_USE_WEBSITE_MODEL || undefined,
+        profileId: process.env.BROWSER_USE_PROFILE_ID || undefined,
         proxyCountryCode: 'pt',
         maxCostUsd: Number(process.env.BROWSER_USE_WEBSITE_MAX_COST_USD || 3),
         outputSchema: APPLY_OUTPUT_SCHEMA,
