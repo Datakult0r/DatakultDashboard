@@ -134,7 +134,7 @@ type RunResult = {
  * Benign agent refusals — honest "I didn't apply" outcomes, NOT bot-detection
  * signals. They must not trigger the 24h auto-pause or halt the run.
  */
-const BENIGN_REASONS = ['needs_human', 'needs_cv_upload', 'needs_account', 'no_easy_apply_button', 'job_not_found', 'no_job_url', 'skipped_required_field', 'stuck', 'no session id', 're-approve'];
+const BENIGN_REASONS = ['needs_human', 'needs_cv_upload', 'needs_account', 'ready_to_send', 'no_easy_apply_button', 'job_not_found', 'no_job_url', 'skipped_required_field', 'stuck', 'no session id', 're-approve'];
 
 function isBenign(reason: string | null | undefined): boolean {
   return Boolean(reason && BENIGN_REASONS.some((b) => reason.includes(b)));
@@ -215,12 +215,22 @@ async function finalizeExecuting(): Promise<{ executed: number; failed: number; 
         score_label: item.score_label || null,
       });
       out.executed++;
+    } else if (isBenign(v.detail)) {
+      // Fill-then-hold: the agent prepared the application; it now needs Philippe to
+      // finish (log in / review & send). Surface as an actionable item in his queue
+      // with the job link — NOT a failure, so it never trips the cool-off.
+      const jobUrl = (payload.job_url as string) || item.source_url || '';
+      const liveUrl = (payload.browser_use_live_url as string) || '';
+      await supabaseServer.from('triage_items').update({
+        action_status: 'pending_review',
+        notes: `🟡 READY — finish & send: ${jobUrl}${liveUrl ? ` · live: ${liveUrl}` : ''}. Cover letter is on this item. (${v.detail})`,
+        updated_at: nowIso,
+      }).eq('id', item.id);
+      out.running++;
     } else {
       await supabaseServer.from('triage_items').update({
         action_status: 'failed',
-        notes: isBenign(v.detail)
-          ? `Needs you: ${v.detail}`
-          : `Apply failed: ${v.detail || v.status}`,
+        notes: `Apply failed: ${v.detail || v.status}`,
         updated_at: nowIso,
       }).eq('id', item.id);
       out.failed++;
