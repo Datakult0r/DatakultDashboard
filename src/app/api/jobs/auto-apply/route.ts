@@ -66,7 +66,7 @@ import type { ActionPayload } from '@/types/triage';
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_CAP = 3;
+const DEFAULT_CAP = 5;
 const HARD_CEILING = 10;
 const MIN_DELAY_MS = 90_000;
 const MAX_DELAY_MS = 180_000;
@@ -309,6 +309,9 @@ export async function GET(request: NextRequest) {
     .eq('action_status', 'approved')
     .in('action_type', ['apply_job_easy', 'apply_job_website'])
     .not('cover_letter', 'is', null)
+    // 'apply_job_easy' sorts before 'apply_job_website' (asc) → the safe
+    // autonomous lane is drained first within the daily cap.
+    .order('action_type', { ascending: true })
     .order('score', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(cap);

@@ -35,8 +35,8 @@ const SEARCH_QUERIES = [
   'agentic AI remote',
 ];
 
-/** Locations to search */
-const SEARCH_LOCATIONS = ['Europe', 'Remote'];
+/** Locations to search — DACH-first + USA + broad remote pools */
+const SEARCH_LOCATIONS = ['Switzerland', 'Germany', 'Austria', 'United States', 'European Union', 'Remote'];
 
 /**
  * Run an Apify actor and wait for results.
@@ -117,33 +117,59 @@ export async function discoverJobs(): Promise<ApifyRunResult> {
   const errors: string[] = [];
 
   // ── LinkedIn Jobs Scraper ──
-  // The actor curious_coder/linkedin-jobs-scraper now requires `urls` (search URLs),
-  // not `queries`. Build LinkedIn search URLs from our query × location matrix.
+  // curious_coder/linkedin-jobs-scraper takes `urls` (LinkedIn search URLs).
+  // TWO passes: (A) Easy-Apply-ONLY (f_AL=true) feeds the autonomous submit lane;
+  // (B) general remote for broad coverage. Pass A runs first so that any job found
+  // in both is deduped to its Easy-Apply form (easyApply=true preserved).
+  const buildSearchUrl = (q: string, loc: string, easyApplyOnly: boolean): string => {
+    const params = new URLSearchParams({
+      keywords: q,
+      location: loc,
+      f_TPR: 'r604800', // posted in last 7 days
+      f_WT: '2',        // remote
+      sortBy: 'DD',     // by date desc
+    });
+    if (easyApplyOnly) params.set('f_AL', 'true'); // LinkedIn "Easy Apply" filter
+    return `https://www.linkedin.com/jobs/search/?${params.toString()}`;
+  };
+
+  // (A) Easy-Apply-only pass — prioritise the lane that can submit autonomously.
+  try {
+    const easyUrls: string[] = [];
+    for (const q of SEARCH_QUERIES) {
+      for (const loc of SEARCH_LOCATIONS) {
+        easyUrls.push(buildSearchUrl(q, loc, true));
+      }
+    }
+    const easyResults = await runActor(
+      apiToken,
+      'curious_coder~linkedin-jobs-scraper',
+      { urls: easyUrls.slice(0, 10), count: 25, scrapeCompany: false },
+      90,
+    );
+    for (const raw of easyResults) {
+      const job = normalizeLinkedInJob(raw);
+      job.easyApply = true; // came from f_AL=true — guaranteed Easy Apply
+      allJobs.push(job);
+    }
+  } catch (err) {
+    errors.push(`LinkedIn easy-apply scraper: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // (B) General remote pass — broad coverage across queries × locations.
   try {
     const urls: string[] = [];
     for (const q of SEARCH_QUERIES.slice(0, 3)) {
       for (const loc of SEARCH_LOCATIONS) {
-        const params = new URLSearchParams({
-          keywords: q,
-          location: loc,
-          f_TPR: 'r604800',     // posted in last 7 days
-          f_WT: '2',            // remote
-          sortBy: 'DD',         // by date desc
-        });
-        urls.push(`https://www.linkedin.com/jobs/search/?${params.toString()}`);
+        urls.push(buildSearchUrl(q, loc, false));
       }
     }
     const linkedInResults = await runActor(
       apiToken,
       'curious_coder~linkedin-jobs-scraper',
-      {
-        urls: urls.slice(0, 6),
-        count: 30,
-        scrapeCompany: false,
-      },
+      { urls: urls.slice(0, 8), count: 30, scrapeCompany: false },
       90,
     );
-
     for (const raw of linkedInResults) {
       allJobs.push(normalizeLinkedInJob(raw));
     }

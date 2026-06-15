@@ -133,13 +133,14 @@ async function submitEasyApply(apiKey: string, task: BrowserUseTask): Promise<Br
   const instructions = [
     'If at ANY point you see a login page, captcha, or security checkpoint: DO NOT log in or solve it. Finish immediately with submitted=false, reason="logged_out".',
     `Navigate to ${task.jobUrl}`,
-    'Read the job description: scroll down slowly (3-5 seconds), then back up. Behave like a careful human.',
+    'ACT LIKE A HUMAN throughout, never like a script: vary your pace, pause 2-6 seconds between actions, read before you click, scroll the page in small increments (not one jump), and move the mouse naturally. Never fill or submit faster than a person reasonably could.',
+    'Read the job description: scroll down slowly over 4-8 seconds taking it in, then scroll back up.',
     'Click the "Easy Apply" button. If there is none, finish with submitted=false, reason="no_easy_apply_button".',
     'Wait for the application form to load.',
     'Keep any values LinkedIn pre-filled. For empty required fields use: Name "Philippe Küng", Email "philippe.kung@clinicofai.com", Location "Lisbon, Portugal"' + (process.env.PHILIPPE_PHONE ? `, Phone "${process.env.PHILIPPE_PHONE}"` : '') + '.',
     task.coverLetter ? `Cover letter: ${task.coverLetter.slice(0, 800)}` : '',
     'If a REQUIRED question cannot be answered from the values above (salary, visa specifics, niche skill years): DO NOT GUESS — discard the application and finish with submitted=false, reason="needs_human", listing the questions in unanswered_questions.',
-    'Otherwise submit and wait for the "application sent" confirmation, then finish with submitted=true.',
+    'Before the final submit, pause ~3-5 seconds to "review" as a human would, then submit and wait for the "application sent" confirmation, and finish with submitted=true.',
   ].filter(Boolean).join('\n');
 
   try {

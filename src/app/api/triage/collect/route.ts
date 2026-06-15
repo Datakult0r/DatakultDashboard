@@ -348,7 +348,11 @@ export async function GET(request: NextRequest) {
             contact_url: s.job.applyUrl || s.job.jobUrl,
             cover_letter: s.coverLetter,
             triage_date: today,
-            action_type: s.score >= 65 ? 'apply_job_website' as const : null,
+            // Route to the autonomous LinkedIn Easy Apply lane when the listing
+            // supports it; otherwise the fill-then-hold website lane.
+            action_type: s.score >= 65
+              ? (s.job.easyApply ? 'apply_job_easy' as const : 'apply_job_website' as const)
+              : null,
             action_payload: s.score >= 65
               ? { job_url: s.job.jobUrl, company_career_url: s.job.applyUrl || '' }
               : {},
