@@ -266,7 +266,8 @@ async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise
       : 'If a CV / resume upload is REQUIRED and cannot be skipped, finish with submitted=false, reason="needs_cv_upload" — do not submit incomplete.',
     'If the form requires creating an account or logging in: finish with submitted=false, reason="needs_account". Never create accounts or log in.',
     'Do NOT invent answers to questions you cannot map to the values above. If a required question is unanswerable, finish with submitted=false, reason="needs_human", listing the fields in unanswered_questions.',
-    'Fill EVERY field you can from the values above and advance to the FINAL review/submit page — but DO NOT click the final Submit/Send button. When the form is complete and you are at the submit step, finish with submitted=false, reason="ready_to_send" (Philippe reviews and sends).',
+    'ACT LIKE A HUMAN: vary pace, pause 2-5s between steps, scroll in small increments, never fill faster than a person could.',
+    'Fill EVERY field you can from the values above, then SUBMIT the application. Wait for the confirmation ("application received" / "thank you for applying") and finish with submitted=true. Only stop WITHOUT submitting if you hit one of the refusal conditions above (account/login required, required CV upload unavailable, or an unanswerable required question) — otherwise complete and submit.',
   ].filter(Boolean).join('\n');
 
   try {
@@ -282,7 +283,6 @@ async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise
         // Company sites carry no LinkedIn ban risk — use the cheap model when configured.
         model: process.env.BROWSER_USE_WEBSITE_MODEL || undefined,
         profileId: process.env.BROWSER_USE_PROFILE_ID || undefined,
-        keepAlive: true, // fill-then-hold: keep the filled session alive so Philippe can review & send
         proxyCountryCode: 'pt',
         maxCostUsd: Number(process.env.BROWSER_USE_WEBSITE_MAX_COST_USD || 3),
         outputSchema: APPLY_OUTPUT_SCHEMA,

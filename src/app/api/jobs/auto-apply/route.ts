@@ -216,14 +216,14 @@ async function finalizeExecuting(): Promise<{ executed: number; failed: number; 
       });
       out.executed++;
     } else if (isBenign(v.detail)) {
-      // Fill-then-hold: the agent prepared the application; it now needs Philippe to
-      // finish (log in / review & send). Surface as an actionable item in his queue
-      // with the job link — NOT a failure, so it never trips the cool-off.
+      // The agent could NOT complete autonomously (login/account required, CV upload
+      // unavailable, or an unanswerable required question). Irreducible human minimum —
+      // surfaced as actionable, NOT a failure (no cool-off).
       const jobUrl = (payload.job_url as string) || item.source_url || '';
       const liveUrl = (payload.browser_use_live_url as string) || '';
       await supabaseServer.from('triage_items').update({
         action_status: 'pending_review',
-        notes: `🟡 READY — finish & send: ${jobUrl}${liveUrl ? ` · live: ${liveUrl}` : ''}. Cover letter is on this item. (${v.detail})`,
+        notes: `🟡 NEEDS YOU — can't auto-complete (${v.detail}): ${jobUrl}${liveUrl ? ` · live: ${liveUrl}` : ''}. Cover letter is on this item.`,
         updated_at: nowIso,
       }).eq('id', item.id);
       out.running++;

@@ -18,6 +18,14 @@ import { generateContentDrafts } from '@/lib/content-engine';
  */
 export const maxDuration = 300;
 
+/**
+ * Full-autonomy gate. Jobs that clear the score are auto-approved (no human click)
+ * so the apply cron submits them directly. The scoring rubric IS the gate.
+ * Set AUTO_APPROVE=false to fall back to manual review without a redeploy.
+ */
+const AUTO_APPROVE = process.env.AUTO_APPROVE !== 'false';
+const AUTO_APPROVE_MIN_SCORE = Number(process.env.AUTO_APPROVE_MIN_SCORE ?? 65);
+
 /** Generate a unique ID for this cron run to group health logs */
 function cronRunId(): string {
   return crypto.randomUUID();
@@ -356,7 +364,10 @@ export async function GET(request: NextRequest) {
             action_payload: s.score >= 65
               ? { job_url: s.job.jobUrl, company_career_url: s.job.applyUrl || '' }
               : {},
-            action_status: s.score >= 65 ? 'pending_review' : null,
+            // Full autonomy: clear the score → auto-approve (cron submits, no click).
+            action_status: s.score >= 65
+              ? (AUTO_APPROVE && s.score >= AUTO_APPROVE_MIN_SCORE ? 'approved' : 'pending_review')
+              : null,
           }));
 
         if (jobItems.length > 0) {
