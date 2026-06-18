@@ -309,9 +309,9 @@ export async function GET(request: NextRequest) {
     .eq('action_status', 'approved')
     .in('action_type', ['apply_job_easy', 'apply_job_website'])
     .not('cover_letter', 'is', null)
-    // 'apply_job_easy' sorts before 'apply_job_website' (asc) → the safe
-    // autonomous lane is drained first within the daily cap.
-    .order('action_type', { ascending: true })
+    // Apply by MERIT, not by lane. Philippe's strategy is direct-to-company-website
+    // applications (found via LinkedIn) — do NOT starve them behind Easy Apply.
+    // Highest score first, regardless of easy vs website.
     .order('score', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(cap);
