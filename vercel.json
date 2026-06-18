@@ -1,24 +1,12 @@
 {
   "crons": [
-    {
-      "path": "/api/triage/collect",
-      "schedule": "45 7 * * *"
-    },
-    {
-      "path": "/api/jobs/auto-apply",
-      "schedule": "23 9 * * *"
-    },
-    {
-      "path": "/api/jobs/auto-apply",
-      "schedule": "47 13 * * *"
-    },
-    {
-      "path": "/api/jobs/auto-apply",
-      "schedule": "11 17 * * *"
-    },
-    {
-      "path": "/api/bumps/discover",
-      "schedule": "0 7 * * 1"
-    }
+    { "path": "/api/triage/collect", "schedule": "45 7 * * *" },
+    { "path": "/api/jobs/auto-apply", "schedule": "23 9 * * *" },
+    { "path": "/api/jobs/auto-apply", "schedule": "47 11 * * *" },
+    { "path": "/api/jobs/auto-apply", "schedule": "11 13 * * *" },
+    { "path": "/api/jobs/auto-apply", "schedule": "53 14 * * *" },
+    { "path": "/api/jobs/auto-apply", "schedule": "31 16 * * *" },
+    { "path": "/api/jobs/auto-apply", "schedule": "17 18 * * *" },
+    { "path": "/api/bumps/discover", "schedule": "0 7 * * 1" }
   ]
 }

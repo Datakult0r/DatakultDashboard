@@ -63,7 +63,7 @@ import { executeEasyApply, executeWebsiteApply, getSessionVerification, stopSess
 import type { BrowserUseTask } from '@/lib/browser-use';
 import type { ActionPayload } from '@/types/triage';
 
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_CAP = 5;
@@ -418,8 +418,15 @@ export async function GET(request: NextRequest) {
  */
 async function processTriageQueue(queue: TriageJobRow[]): Promise<RunResult[]> {
   const results: RunResult[] = [];
+  const loopStart = Date.now();
+  // Never let the platform timeout kill the function mid-launch (which strands
+  // a session as unverifiable 'executing'). Stop launching as we approach the
+  // budget; remaining approved items wait for the next window, which also
+  // finalizes everything launched here. Tune via APPLY_RUN_BUDGET_MS.
+  const RUN_BUDGET_MS = Number(process.env.APPLY_RUN_BUDGET_MS ?? 240_000);
 
   for (let i = 0; i < queue.length; i++) {
+    if (Date.now() - loopStart > RUN_BUDGET_MS) break;
     const item = queue[i];
 
     // Mark executing
