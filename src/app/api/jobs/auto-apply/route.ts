@@ -442,6 +442,7 @@ async function processTriageQueue(queue: TriageJobRow[]): Promise<RunResult[]> {
       jobTitle: item.role_title || item.title || '',
       company: item.company || '',
       coverLetter: item.cover_letter,
+      companyCareerUrl: (payload?.company_career_url as string) || null,
     };
 
     if (!task.jobUrl) {

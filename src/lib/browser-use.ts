@@ -21,6 +21,7 @@ export interface BrowserUseTask {
   jobTitle: string;
   company: string;
   coverLetter: string | null;
+  companyCareerUrl?: string | null;
 }
 
 export interface BrowserUseResult {
@@ -239,8 +240,13 @@ export async function executeEasyApply(tasks: BrowserUseTask[]): Promise<EasyApp
  * Instructions are deliberately generic — no "Click Easy Apply" assumption.
  */
 async function submitWebsiteApply(apiKey: string, task: BrowserUseTask): Promise<BrowserUseResult> {
+  const career = (task.companyCareerUrl || '').trim();
+  const careerIsUsable = career && !/linkedin\.com/i.test(career);
+  const navLine = careerIsUsable
+    ? `Go directly to the company's application page: ${career}`
+    : `This role (${task.jobTitle} at ${task.company}) was found on a LinkedIn posting (${task.jobUrl}). DO NOT apply on LinkedIn and DO NOT log into LinkedIn — LinkedIn always demands a login and that is not the goal. Instead, open ${task.company}'s OWN official careers/jobs website (use a web search for "${task.company} careers ${task.jobTitle}" if you don't know the URL), find this role or the closest matching open role, and open its application form on the company's own domain.`;
   const instructions = [
-    `Navigate to ${task.jobUrl}`,
+    navLine,
     'Wait 2-4 seconds (randomized).',
     'Find and click the apply button (commonly labeled "Apply", "Apply Now", "Apply for this job", or similar).',
     'If the application opens in a new tab, switch to it.',
