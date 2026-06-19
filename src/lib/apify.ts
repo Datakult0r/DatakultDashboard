@@ -16,7 +16,7 @@ interface ApifyJobResult {
   salary: string | null;
   jobType: string | null;
   easyApply: boolean;
-  source: 'linkedin' | 'indeed' | 'remoteok' | 'glassdoor' | 'arbeit_swiss';
+  source: 'linkedin' | 'indeed' | 'remoteok' | 'glassdoor' | 'arbeit_swiss' | 'swissdevjobs';
 }
 
 interface ApifyRunResult {

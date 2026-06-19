@@ -6,6 +6,7 @@ import { fetchCalendarEvents } from '@/lib/calendar';
 import { discoverJobs } from '@/lib/apify';
 import { discoverJobsRemoteOK } from '@/lib/remoteok';
 import { discoverJobsArbeitSwiss } from '@/lib/arbeit-swiss';
+import { discoverJobsSwissDevJobs } from '@/lib/swissdevjobs';
 import { scoreJobs } from '@/lib/job-scoring';
 import { tailorCVForJobs } from '@/lib/cv-tailor';
 import { scrapeIntelligence, scrapeCareerPage, scrapeCompanyAbout, scrapeOgImage } from '@/lib/firecrawl';
@@ -308,10 +309,23 @@ export async function GET(request: NextRequest) {
         await logHealth(runId, 'arbeit_swiss', 'discover_jobs', 'error', 0, 0, asMsg);
       }
 
+      // SwissDevJobs — Swiss tech jobs w/ salary (RSS), filtered to AI/GenAI. DACH source.
+      let swissDevItems: typeof apifyResult.items = [];
+      try {
+        const sdj = await discoverJobsSwissDevJobs();
+        swissDevItems = sdj.items;
+        await logHealth(runId, 'swissdevjobs', 'discover_jobs', sdj.error ? (sdj.items.length > 0 ? 'ok' : 'error') : 'ok',
+          sdj.items.length, sdj.durationMs, sdj.error || undefined);
+      } catch (sdjErr) {
+        const sdjMsg = sdjErr instanceof Error ? sdjErr.message : String(sdjErr);
+        await logHealth(runId, 'swissdevjobs', 'discover_jobs', 'error', 0, 0, sdjMsg);
+      }
+
       // Merge dedup-by-jobUrl
       const seenUrls = new Set(apifyResult.items.map((j) => j.jobUrl));
       for (const j of remoteOkItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
       for (const j of arbeitSwissItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
+      for (const j of swissDevItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
 
       results.jobs.discovered = apifyResult.items.length;
 
