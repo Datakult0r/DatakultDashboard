@@ -35,6 +35,17 @@ const SEARCH_QUERIES = [
   'agentic AI remote',
 ];
 
+/**
+ * Broader query set used ONLY for the LinkedIn Easy-Apply pass. Easy Apply is a thin
+ * lane for senior/DACH roles (those use company ATS), so we cast a wider net here —
+ * the scoring rubric still filters fit; this just surfaces more Easy-Apply candidates.
+ */
+const EASY_APPLY_QUERIES = [
+  'generative AI', 'AI engineer', 'machine learning engineer', 'data scientist',
+  'AI consultant', 'prompt engineer', 'LLM engineer', 'applied AI', 'NLP engineer',
+  'AI developer',
+];
+
 /** Locations to search — DACH-first + USA + broad remote pools */
 const SEARCH_LOCATIONS = ['Switzerland', 'Germany', 'Austria', 'United States', 'European Union', 'Remote'];
 
@@ -136,7 +147,7 @@ export async function discoverJobs(): Promise<ApifyRunResult> {
   // (A) Easy-Apply-only pass — prioritise the lane that can submit autonomously.
   try {
     const easyUrls: string[] = [];
-    for (const q of SEARCH_QUERIES) {
+    for (const q of EASY_APPLY_QUERIES) {
       for (const loc of SEARCH_LOCATIONS) {
         easyUrls.push(buildSearchUrl(q, loc, true));
       }
@@ -144,8 +155,8 @@ export async function discoverJobs(): Promise<ApifyRunResult> {
     const easyResults = await runActor(
       apiToken,
       'curious_coder~linkedin-jobs-scraper',
-      { urls: easyUrls.slice(0, 10), count: 25, scrapeCompany: false },
-      90,
+      { urls: easyUrls.slice(0, 18), count: 40, scrapeCompany: false },
+      110,
     );
     for (const raw of easyResults) {
       const job = normalizeLinkedInJob(raw);
