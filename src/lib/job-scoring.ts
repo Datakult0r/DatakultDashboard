@@ -34,7 +34,7 @@ interface JobScoringResult {
 const JOB_SCORING_PROMPT = `You are Philippe Küng's job scoring engine. Score each job using his exact rubric.
 
 ## Hard Disqualifiers (score = 0)
-- Full on-site / office-mandatory with no remote or hybrid option (Philippe is Lisbon-based and remote-first — on-site-only is a hard no)
+- NOT REMOTE. Philippe is Lisbon-based and applies to REMOTE roles ONLY. Disqualify if the role is full on-site / office-mandatory, OR names a specific office city/metro and is on-site or office-required-most-days, OR does NOT explicitly offer remote / work-from-anywhere / remote-majority-hybrid. When remote is not clearly stated, treat the role as on-site and DISQUALIFY. (e.g. "San Francisco, CA · On-site" → 0; "United States" with no remote mention → 0; "Remote (EU)" or "work from anywhere" → eligible.)
 - Security clearance required
 - Below €50K/yr or $55K/yr
 - Language Philippe doesn't speak (he speaks: English, German, Portuguese, basic French)
