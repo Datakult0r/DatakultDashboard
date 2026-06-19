@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
-import { fetchUnreadEmails } from '@/lib/gmail';
+import { fetchUnreadEmails, fetchJobEmails } from '@/lib/gmail';
 import { scoreEmails } from '@/lib/scoring';
 import { fetchCalendarEvents } from '@/lib/calendar';
 import { discoverJobs } from '@/lib/apify';
 import { discoverJobsRemoteOK } from '@/lib/remoteok';
 import { discoverJobsArbeitSwiss } from '@/lib/arbeit-swiss';
 import { discoverJobsSwissDevJobs } from '@/lib/swissdevjobs';
+import { extractJobsFromEmails } from '@/lib/job-emails';
 import { scoreJobs } from '@/lib/job-scoring';
 import { tailorCVForJobs } from '@/lib/cv-tailor';
 import { scrapeIntelligence, scrapeCareerPage, scrapeCompanyAbout, scrapeOgImage } from '@/lib/firecrawl';
@@ -326,6 +327,20 @@ export async function GET(request: NextRequest) {
       for (const j of remoteOkItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
       for (const j of arbeitSwissItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
       for (const j of swissDevItems) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); }
+
+      // Recommended-jobs from Gmail (LinkedIn "jobs for you" digests, incl. Promotions).
+      // Parsed into the SAME scoring rubric as every other discovered job.
+      try {
+        const jobEmails = await fetchJobEmails();
+        const { items: emailJobs, emailsScanned } = extractJobsFromEmails(jobEmails);
+        let added = 0;
+        for (const j of emailJobs) if (!seenUrls.has(j.jobUrl)) { apifyResult.items.push(j); seenUrls.add(j.jobUrl); added++; }
+        await logHealth(runId, 'gmail_recommended', 'discover_jobs', 'ok', added, 0,
+          `scanned ${emailsScanned} job emails, +${added} jobs`);
+      } catch (jeErr) {
+        await logHealth(runId, 'gmail_recommended', 'discover_jobs', 'error', 0, 0,
+          jeErr instanceof Error ? jeErr.message : String(jeErr));
+      }
 
       results.jobs.discovered = apifyResult.items.length;
 

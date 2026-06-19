@@ -128,7 +128,7 @@ async function getMessage(
     to: getHeader('To'),
     subject: getHeader('Subject'),
     snippet: data.snippet || '',
-    body: body.slice(0, 2000), // Limit body to 2000 chars for scoring
+    body: body.slice(0, 9000), // capture enough for multi-job recommendation digests
     date: getHeader('Date'),
     isUnread: (data.labelIds || []).includes('UNREAD'),
     labels: data.labelIds || [],
@@ -207,6 +207,54 @@ export async function fetchUnreadEmails(): Promise<GmailMessage[]> {
   }
 
   return allMessages;
+}
+
+/**
+ * Fetch job-recommendation / job-alert emails (LinkedIn etc.) from BOTH accounts.
+ * Unlike fetchUnreadEmails, this DELIBERATELY includes Promotions/Updates — that's
+ * where LinkedIn puts "jobs recommended for you" digests — but scopes to job senders
+ * so it doesn't drag general newsletter noise into the job pipeline. Parsed by
+ * extractJobsFromEmails (src/lib/job-emails.ts).
+ */
+async function fetchJobEmailsFromAccount(
+  creds: GmailCredentials,
+  account: 'business' | 'personal'
+): Promise<GmailMessage[]> {
+  const accessToken = await getAccessToken(creds);
+  // Includes Promotions/Updates (no -category exclusions); scoped to LinkedIn job mail.
+  const query = 'newer_than:7d from:linkedin.com (subject:job OR subject:jobs OR subject:hiring OR subject:recommended OR subject:alert OR subject:opportunities OR subject:role OR subject:"for you")';
+  const messageRefs = await listMessages(accessToken, query, 25);
+  if (messageRefs.length === 0) return [];
+  const messages: GmailMessage[] = [];
+  const batchSize = 10;
+  for (let i = 0; i < messageRefs.length; i += batchSize) {
+    const batch = messageRefs.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map((ref) => getMessage(accessToken, ref.id, account)));
+    messages.push(...batchResults);
+  }
+  return messages;
+}
+
+export async function fetchJobEmails(): Promise<GmailMessage[]> {
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) return [];
+  const all: GmailMessage[] = [];
+  try {
+    all.push(...await fetchJobEmailsFromAccount({ clientId, clientSecret, refreshToken }, 'business'));
+  } catch (err) {
+    console.error(`Business job-email fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const personal = process.env.GMAIL_REFRESH_TOKEN_PERSONAL;
+  if (personal) {
+    try {
+      all.push(...await fetchJobEmailsFromAccount({ clientId, clientSecret, refreshToken: personal }, 'personal'));
+    } catch (err) {
+      console.error(`Personal job-email fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return all;
 }
 
 export type { GmailMessage };
