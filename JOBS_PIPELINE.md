@@ -30,6 +30,23 @@ LinkedIn's bot detection probes IP fingerprints, storageState replay anomalies, 
 
 The anti-detection envelope (cap, randomized delays, halt-on-failure, 24h cool-off) is also non-negotiable — do not lower any value without re-reading `feedback_no_playwright.md` and `feedback_linkedin_protocol.md`.
 
+## 🧭 Controller routing — which tool sends which application
+
+The pipeline has THREE execution controllers. Pick by **channel + flag-risk + cost**, not by convenience.
+
+| Channel / situation | Controller | Why | Cost |
+|---|---|---|---|
+| **LinkedIn Easy Apply** (`apply_job_easy`) | **Browser Use Cloud v3** + persistent profile (`BROWSER_USE_PROFILE_ID`), PT proxy, human pacing, daily cap, jittered windows | On-platform LinkedIn automation is the highest flag-risk action we take. Browser Use is the most advanced anti-detection layer and the only sanctioned way to touch a logged-in LinkedIn session at scale. | Browser Use credits (needs ≥ $1 balance) |
+| **Company-website / employer ATS** (`apply_job_website`: Greenhouse, Lever, Workday, Ashby, custom) — **autonomous, at scale** | **Browser Use Cloud v3** website flow (cheaper model, no LinkedIn login) | Off-LinkedIn = no account-ban risk; run it headless at volume when credits allow. | Browser Use credits |
+| **Company-website / employer ATS** — **when Browser Use credits are low/zero, OR a human wants to review before sending, OR the form needs account-creation / judgment / extra free-text answers** | **Claude Chrome extension** (Philippe's own logged-in browser; Claude fills, Philippe clicks Submit) | FREE — uses no Browser Use credits. Zero LinkedIn-ban risk: it's the employer's own site, and it's a human in their own browser, not a script hammering LinkedIn. Human-in-the-loop handles account walls and ambiguous questions Browser Use would stall on. | $0 |
+| **Native desktop app / nothing web** | **computer-use / Desktop Commander** | Only when Philippe is at the keyboard. Cron has no desktop. | $0 |
+
+### Hard rules
+- **Never** automate LinkedIn Easy Apply through the Claude Chrome extension or computer-use — Easy Apply at volume must go through Browser Use's anti-detection envelope. (A human manually clicking Apply on a single posting in their own browser is fine; *scripting* it is not.)
+- **Never** apply *on* LinkedIn for non-Easy-Apply roles — go to the employer's own careers site (see `apply-root-cause-company-site`).
+- **Credit-aware fallback (the rule for "no money for credits"):** if Browser Use balance < $1, the `apply_job_website` lane automatically falls back to **Chrome-extension-assisted manual** (free), and `apply_job_easy` **pauses** until credits are topped up — Easy Apply has no free substitute because the anti-detection layer is the whole point.
+- The Chrome-extension path still obeys everything else: only roles Philippe is **work-authorized** for (EU/CH; US work-auth STOP rule in `APPLICANT_PROFILE.md`), and every real submission is logged to `job_applications`.
+
 ## State machine
 
 ```
