@@ -81,18 +81,48 @@ async function runActor(
  * Normalize LinkedIn Jobs Scraper output to our standard format.
  * Actor: apify/linkedin-jobs-scraper (or similar public actor)
  */
+/**
+ * Detect Easy Apply vs external/website apply from whatever fields the
+ * curious_coder actor emits. The general (non-f_AL) search pass does NOT set
+ * `easyApply`, so relying on that alone mislabels real Easy-Apply jobs as
+ * website (root cause of NLB/Jecona landing in the wrong lane, 2026-06-22).
+ *
+ * Signals, in priority order:
+ *   - explicit booleans easyApply / isEasyApply
+ *   - applyType / applyMethod strings: LinkedIn uses *OnsiteApply (Easy Apply)
+ *     vs OffsiteApply / EXTERNAL (company site)
+ *   - an external (non-linkedin) apply URL => company site
+ * Unknown stays false (website lane) — that lane is free and the website agent
+ * fails safe; but most jobs now classify correctly.
+ */
+function detectEasyApply(raw: Record<string, unknown>): boolean {
+  if (raw.easyApply === true || raw.isEasyApply === true) return true;
+  const method = String(
+    raw.applyType ?? raw.applyMethod ?? raw.apply_type ?? raw.applicationType ?? ''
+  ).toLowerCase();
+  if (method) {
+    if (method.includes('offsite') || method.includes('external')) return false;
+    if (method.includes('easy') || method.includes('onsite')) return true; // Simple/ComplexOnsiteApply
+  }
+  const ext = String(
+    raw.applyUrl ?? raw.companyApplyUrl ?? raw.externalApplyUrl ?? raw.companyApplyURL ?? ''
+  );
+  if (ext && !ext.toLowerCase().includes('linkedin.com')) return false; // explicit external URL
+  return false;
+}
+
 function normalizeLinkedInJob(raw: Record<string, unknown>): ApifyJobResult {
   return {
     title: String(raw.title || raw.jobTitle || ''),
     company: String(raw.company || raw.companyName || ''),
     location: String(raw.location || raw.jobLocation || ''),
     jobUrl: String(raw.url || raw.jobUrl || raw.link || ''),
-    applyUrl: raw.applyUrl ? String(raw.applyUrl) : null,
+    applyUrl: (() => { const u = String(raw.applyUrl ?? raw.companyApplyUrl ?? raw.externalApplyUrl ?? ''); return u && !u.toLowerCase().includes('linkedin.com') ? u : null; })(),
     description: String(raw.description || raw.descriptionText || '').slice(0, 3000),
     postedAt: String(raw.postedAt || raw.publishedAt || raw.listedAt || ''),
     salary: raw.salary ? String(raw.salary) : (raw.salaryRange ? String(raw.salaryRange) : null),
     jobType: raw.jobType ? String(raw.jobType) : (raw.employmentType ? String(raw.employmentType) : null),
-    easyApply: Boolean(raw.easyApply || raw.isEasyApply || false),
+    easyApply: detectEasyApply(raw),
     source: 'linkedin' as const,
   };
 }
