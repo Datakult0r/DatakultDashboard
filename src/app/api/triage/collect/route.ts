@@ -368,7 +368,7 @@ export async function GET(request: NextRequest) {
           .map((s) => ({
             title: `${s.job.title} at ${s.job.company}`,
             subtitle: s.job.description.slice(0, 200),
-            source: (s.job.source === 'linkedin' || s.job.source === 'remoteok' || s.job.source === 'arbeit_swiss') ? s.job.source : 'other',
+            source: (['linkedin','remoteok','arbeit_swiss','swissdevjobs','gmail_recommended'].includes(s.job.source as string)) ? s.job.source : 'other',
             category: 'job' as const,
             score: s.score,
             score_label: s.scoreLabel,
@@ -712,11 +712,11 @@ export async function GET(request: NextRequest) {
         .select('id, company, role_title, action_payload')
         .eq('triage_date', today)
         .eq('category', 'job')
-        .eq('score_label', 'strong')
-        .is('action_status', 'pending_review');
+        .eq('action_type', 'apply_job_website')
+        .in('action_status', ['approved', 'pending_review']);
 
       if (strongJobs && strongJobs.length > 0) {
-        for (const job of strongJobs.slice(0, 5)) { // Max 5 career page lookups
+        for (const job of strongJobs.slice(0, 12)) { // resolve direct company URL for website applies
           const careerUrl = await scrapeCareerPage(
             job.company || '',
             job.role_title || ''
