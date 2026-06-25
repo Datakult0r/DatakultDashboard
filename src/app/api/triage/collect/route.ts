@@ -18,7 +18,7 @@ import { generateContentDrafts } from '@/lib/content-engine';
  * Maximum duration for Vercel serverless function (seconds).
  * Pro plan allows 300s. Full pipeline: Gmail + Apify + Firecrawl + Claude scoring + content = ~120-240s.
  */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Full-autonomy gate. Jobs that clear the score are auto-approved (no human click)
@@ -352,9 +352,29 @@ export async function GET(request: NextRequest) {
         await logHealth(runId, 'apify', 'discover_jobs', 'ok', apifyResult.items.length, apifyResult.durationMs);
       }
 
+      // Cross-run dedup: skip jobs already in triage_items so we only spend
+      // Claude scoring on NEW listings. Without this, ~140 mostly-duplicate jobs
+      // were re-scored daily, overrunning maxDuration → the whole batch silently
+      // dropped (claude_scoring stopped logging after 2026-06-18, queue went dry).
+      let freshItems = apifyResult.items;
+      try {
+        const urls = apifyResult.items.map((j) => j.jobUrl).filter(Boolean);
+        if (urls.length > 0) {
+          const seen = new Set<string>();
+          const chunk = 150;
+          for (let i = 0; i < urls.length; i += chunk) {
+            const { data: ex } = await supabaseServer
+              .from('triage_items').select('source_url').in('source_url', urls.slice(i, i + chunk));
+            for (const r of ex || []) if (r.source_url) seen.add(r.source_url as string);
+          }
+          freshItems = apifyResult.items.filter((j) => !seen.has(j.jobUrl));
+        }
+      } catch { /* dedup is best-effort — never block scoring */ }
+      await logHealth(runId, 'dedup', 'cross_run', 'ok', apifyResult.items.length - freshItems.length, 0);
+
       if (apifyResult.items.length > 0) {
-        // Score all discovered jobs
-        const scoringResult = await scoreJobs(apifyResult.items);
+        // Score only the NEW jobs (huge reduction → fits in the time budget)
+        const scoringResult = await scoreJobs(freshItems);
         results.jobs.scored = scoringResult.scored.length;
         results.jobs.strong = scoringResult.scored.filter((s) => s.scoreLabel === 'strong').length;
         results.jobs.coverLetters = scoringResult.scored.filter((s) => s.coverLetter).length;
